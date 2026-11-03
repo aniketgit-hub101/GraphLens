@@ -25,6 +25,7 @@ type User {
 
 type Invoice {
   id: ID!
+  ownerId: ID!
   number: String!
   amount: Float!
   currency: String!
@@ -165,6 +166,7 @@ _SCHEMA.type_map["Query"].fields["invoices"].resolve = _resolve_invoices
 _SCHEMA.type_map["Query"].fields["customer"].resolve = _resolve_customer
 _SCHEMA.type_map["User"].fields["invoices"].resolve = _resolve_user_invoices
 _SCHEMA.type_map["Invoice"].fields["owner"].resolve = _resolve_invoice_owner
+_SCHEMA.type_map["Invoice"].fields["ownerId"].resolve = lambda invoice, _info: invoice["owner_id"]
 _SCHEMA.type_map["Invoice"].fields["customer"].resolve = _resolve_invoice_customer
 _SCHEMA.type_map["Invoice"].fields["internalNotes"].resolve = lambda obj, info: _resolve_restricted_invoice_field(obj, info, "internal_notes")
 _SCHEMA.type_map["Invoice"].fields["paymentReference"].resolve = lambda obj, info: _resolve_restricted_invoice_field(obj, info, "payment_reference")

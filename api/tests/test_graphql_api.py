@@ -10,7 +10,7 @@ from api.runner import execute_graphql as execute_engine_graphql
 class ExecuteGraphqlTests(unittest.TestCase):
     def test_alice_can_read_owned_invoice_and_private_fields(self):
         result = execute_graphql(
-            '{ invoice(id: "inv-alice-001") { number internalNotes paymentReference customer { name email taxId } } }',
+            '{ invoice(id: "invoice-alice-001") { number internalNotes paymentReference customer { name email taxId } } }',
             "Alice", {},
         )
         self.assertEqual(result["status"], "success")
@@ -21,7 +21,7 @@ class ExecuteGraphqlTests(unittest.TestCase):
 
     def test_bob_cannot_read_alice_invoice_or_nested_customer(self):
         result = execute_graphql(
-            '{ invoice(id: "inv-alice-001") { id customer { id email } } customer(id: "customer-alice") { id } }',
+            '{ invoice(id: "invoice-alice-001") { id customer { id email } } customer(id: "customer-alice") { id } }',
             "Bob", {},
         )
         self.assertEqual(result["status"], "success")
@@ -30,7 +30,7 @@ class ExecuteGraphqlTests(unittest.TestCase):
 
     def test_anonymous_cannot_list_or_read_protected_invoices(self):
         result = execute_graphql(
-            '{ invoices { id } invoice(id: "inv-alice-001") { id } }', "Anonymous", {},
+            '{ invoices { id } invoice(id: "invoice-alice-001") { id } }', "Anonymous", {},
         )
         self.assertEqual(result["data"]["invoices"], [])
         self.assertIsNone(result["data"]["invoice"])
@@ -39,27 +39,27 @@ class ExecuteGraphqlTests(unittest.TestCase):
         result = execute_graphql(
             '{ me { name invoices { id customer { name email } } } }', "Bob", {},
         )
-        self.assertEqual([item["id"] for item in result["data"]["me"]["invoices"]], ["inv-bob-001"])
+        self.assertEqual([item["id"] for item in result["data"]["me"]["invoices"]], ["invoice-bob-001"])
         self.assertEqual(result["data"]["me"]["invoices"][0]["customer"]["email"], "bob.customer@example.test")
 
     def test_bola_and_bopla_mutants_can_be_activated(self):
-        query = '{ invoice(id: "inv-alice-001") { internalNotes paymentReference customer { email } } }'
+        query = '{ invoice(id: "invoice-alice-001") { internalNotes paymentReference customer { email } } }'
         result = execute_graphql(query, "Bob", {"mutants": ["BOLA", "BOPLA"]})
         self.assertIsNotNone(result["data"]["invoice"])
         self.assertIsNotNone(result["data"]["invoice"]["internalNotes"])
         self.assertIsNotNone(result["data"]["invoice"]["customer"]["email"])
 
     def test_root_bola_is_independently_configurable(self):
-        result = execute_graphql('{ invoice(id: "inv-alice-001") { id } }', "Bob", {"mutants": ["ROOT_BOLA"]})
-        self.assertEqual(result["data"]["invoice"]["id"], "inv-alice-001")
+        result = execute_graphql('{ invoice(id: "invoice-alice-001") { id } }', "Bob", {"mutants": ["ROOT_BOLA"]})
+        self.assertEqual(result["data"]["invoice"]["id"], "invoice-alice-001")
 
     def test_nested_bola_is_independently_configurable(self):
         result = execute_graphql('{ customer(id: "customer-alice") { id name } }', "Bob", {"mutants": ["NESTED_BOLA"]})
         self.assertEqual(result["data"]["customer"]["id"], "customer-alice")
 
     def test_auth_bypass_allows_anonymous_protected_access(self):
-        result = execute_graphql('{ invoice(id: "inv-alice-001") { id internalNotes } }', "Anonymous", {"mutants": ["AUTH_BYPASS"]})
-        self.assertEqual(result["data"]["invoice"]["id"], "inv-alice-001")
+        result = execute_graphql('{ invoice(id: "invoice-alice-001") { id internalNotes } }', "Anonymous", {"mutants": ["AUTH_BYPASS"]})
+        self.assertEqual(result["data"]["invoice"]["id"], "invoice-alice-001")
         self.assertIsNotNone(result["data"]["invoice"]["internalNotes"])
 
     def test_graphql_errors_have_consistent_shape(self):
@@ -69,19 +69,20 @@ class ExecuteGraphqlTests(unittest.TestCase):
         self.assertTrue(result["errors"])
 
     def test_engine_adapter_returns_structured_response_for_c0_identities(self):
-        query = '{ invoice(id: "inv-alice-001") { id } }'
+        query = '{ invoice(id: "invoice-alice-001") { id ownerId amount } }'
         alice = execute_engine_graphql(query, "alice", SimpleNamespace(enabled_mutants=frozenset()))
         bob = execute_engine_graphql(query, "bob", SimpleNamespace(enabled_mutants=frozenset()))
         anonymous = execute_engine_graphql(query, "anonymous", SimpleNamespace(enabled_mutants=frozenset()))
-        self.assertEqual(alice.data["invoice"]["id"], "inv-alice-001")
+        self.assertEqual(alice.data["invoice"]["id"], "invoice-alice-001")
+        self.assertEqual(alice.data["invoice"]["ownerId"], "user-alice")
         self.assertIsNone(bob.data["invoice"])
         self.assertIsNone(anonymous.data["invoice"])
         self.assertEqual(alice.errors, ())
 
     def test_engine_m1_configuration_exposes_root_bola(self):
         config = SimpleNamespace(enabled_mutants=frozenset({"M1"}))
-        response = execute_engine_graphql('{ invoice(id: "inv-alice-001") { id } }', "bob", config)
-        self.assertEqual(response.data["invoice"]["id"], "inv-alice-001")
+        response = execute_engine_graphql('{ invoice(id: "invoice-alice-001") { id } }', "bob", config)
+        self.assertEqual(response.data["invoice"]["id"], "invoice-alice-001")
 
     def test_engine_adapter_preserves_graphql_error_paths(self):
         response = execute_engine_graphql("{ missingField }", "alice", SimpleNamespace(enabled_mutants=frozenset()))
