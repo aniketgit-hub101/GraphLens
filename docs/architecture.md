@@ -1,45 +1,40 @@
-# GraphLens architecture (working draft)
+# GraphLens backend architecture
 
-Status: **engine implementation draft; shared interfaces still require approval from Adeel (API) and Abhay (security tests).** This document is not approval on their behalf. Code in `engine/` and `policies/` uses the proposed types from `engine/contracts.py` while preserving adapter boundaries so their modules can be integrated without editing their owned files.
+## Execution flow
 
-## Boundaries and owners
+```text
+T01–T12 corpus ─┐
+                ├─> engine.integration adapters ─> benchmark runner ─> JSON report
+C0–C5 configs ──┘                                     │
+                                                     v
+                                   real GraphQL API -> policy evaluator
+```
 
-- `api/` (Adeel) supplies `execute_graphql(query, identity, config) -> GraphQLResponse`. It executes the actual schema/resolvers and returns real `data` and GraphQL errors. It must not return a verdict.
-- `tests/` (Abhay) supplies `get_test_corpus() -> tuple[TestCase, ...]`. Cases specify target response path/object ID/property, expected policy outcome, evidence requirements, and explicit inconclusive reason where applicable.
-- `mutants/` (Abhay/API coordination) supplies `get_configurations() -> tuple[Configuration, ...]` for C0–C5. Enabled mutants alter API behavior; the evaluator never uses mutant flags to decide verdicts.
-- `policies/evaluator.py` evaluates observed response data against the case's expected outcome and target.
-- `engine/benchmark.py` validates T01–T12 and C0–C5, executes each pair once, records runtime/evidence/errors, and records failures separately from verdicts.
-- `engine/reporting.py` implements `generate_report(report, destination) -> Path`; it serializes only a completed `BenchmarkReport`.
-- `main.py` wires integrations, prints measured counts, and writes JSON only after an actual run.
+### API
 
-## Proposed shared schemas
+`api.runner.execute_graphql(query, identity, config, variables=None)` passes the provided variables to graphql-core and returns `engine.contracts.GraphQLResponse`. The response carries actual data and structured `GraphQLErrorInfo(message, path, locations)` values. Configurations enable API behavior only; the evaluator never reads mutant flags.
 
-Canonical provisional value objects are in `engine/contracts.py`:
+### Corpus and configurations
 
-- `Identity`: literal values `alice`, `bob`, `anonymous`.
-- `Configuration`: `configuration_id`, `name`, `enabled_mutants`.
-- `Target`: `response_path` (GraphQL response keys, including aliases), required `object_id`, optional `property_name`, and optional `property_path` relative to the object.
-- `GraphQLResponse`: `data`, `errors` with message/path, optional HTTP status. Status code never determines a verdict.
-- `TestCase`: `test_id`, `description`, `identity`, `operation`, `target`, `expected_outcome`, `evidence_requirements`, optional `inconclusive_reason`.
-- `Evaluation`: one of exactly `PASS`, `POLICY_VIOLATION`, `INCONCLUSIVE`, plus evidence, expected outcome, and actual observation.
-- `BenchmarkResult`: one test/configuration pair, identity, expected outcome, observation, optional verdict (absent only for failed units), evidence, runtime, GraphQL errors, and execution error.
+The source corpus has 12 stable IDs and uses `operation`, tuple-pair variables, a structured corpus `Target`, lowercase identity strings, and `allow` / `deny` / `inconclusive` intent. The configuration source exposes C0–C5 with immutable mutant sets. `engine.integration` converts these values into canonical engine `TestCase`, `Target`, and `Configuration` objects. T04 remains explicitly inconclusive and needs no single-object target.
 
-The proposed import locations are `api.runner.execute_graphql`, `tests.corpus.get_test_corpus`, and `mutants.configurations.get_configurations`. These names and the `Target` shape need explicit owner approval before they are treated as final. Owners can request changes before implementation lands on their branches.
+T05–T08 query the customer resolver directly. Its authorization is tied to linked invoice ownership, so M2 can be exercised independently of the root invoice resolver.
 
-## Policy evaluation rules
+### Policy evaluator
 
-`policies/rules.json` documents the three supported expected outcomes. `evaluate_policy(identity, operation, response)` examines the object/property at the target response path:
+The evaluator classifies observations, not declared outcomes alone:
 
-- `allow`: PASS only when the requested target and any expected property are evidenced. Missing evidence is INCONCLUSIVE.
-- `deny_object`: POLICY_VIOLATION if the targeted object is returned; PASS for absent/null data only when no relevant GraphQL error undermines classification.
-- `deny_property`: POLICY_VIOLATION if a selected restricted property has a non-null returned value; PASS when selected and null without a relevant error. Missing selection/evidence is INCONCLUSIVE.
+- An allowed target must be present; configured owner evidence must also match.
+- A returned denied object or non-null restricted property is a policy violation.
+- An explicitly selected null/withheld target can establish denial only without a relevant GraphQL error.
+- Missing response paths, missing property selections, mismatched target identity, and relevant execution errors are inconclusive.
 
-Partial data can still prove exposure. Relevant field errors, pathless errors, or missing data prevent a denial from being mistaken for a clean policy result. HTTP 200 is ignored by the classifier.
+Evidence output contains observed facts and errors, not unverified requirement labels. `policies/rules.json` documents these semantics; the Python evaluator implements them.
 
-## Benchmark accounting
+### Benchmark and reporting
 
-Default execution requires exactly 12 cases and six configurations, and rejects duplicate or missing IDs. It records one result for every pair in config-major order. Executor/evaluator exceptions become failed units with no verdict; they do not count as PASS, POLICY_VIOLATION, or INCONCLUSIVE. Counts and per-configuration statistics derive only from result objects.
+The runner validates the exact T01–T12 and C0–C5 sets, executes 72 unique pairs, and measures elapsed time with `perf_counter`. Executor/evaluator exceptions create result rows with `verdict=None` and `execution_error`, separate from verdict counts. The report checks pair uniqueness and derives all counts from result rows. `main.py` runs the benchmark, prints a summary, writes JSON, and returns a nonzero status for failed units or setup/report errors.
 
-## Current integration limitation
+## Backend boundary
 
-The checked out remote feature branches contain no API, corpus, or mutant implementation. Consequently `python main.py` will clearly report missing integrations until those packages expose the proposed functions. The engine does not fabricate fixture responses, corpus cases, configurations, or benchmark counts.
+No dashboard, frontend, Flask app, or visual component is part of this backend milestone.

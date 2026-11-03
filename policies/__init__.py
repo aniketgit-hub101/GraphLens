@@ -1,1 +1,1 @@
-"""Authorization policy package. Implementation is not started yet."""
+"""Evidence-based GraphQL authorization policy evaluator."""

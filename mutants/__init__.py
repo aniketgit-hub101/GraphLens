@@ -1,2 +1,2 @@
-"""Seeded, switchable mutant package. Implementation is not started yet."""
+"""Seeded security mutants and C0–C5 benchmark configurations."""
 """GraphLens declarative mutant profiles and configurations."""

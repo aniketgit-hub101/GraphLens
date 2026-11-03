@@ -6,7 +6,7 @@ from enum import Enum
 from typing import Literal, Mapping, Protocol, TypeAlias
 
 Identity: TypeAlias = Literal["alice", "bob", "anonymous"]
-ExpectedOutcome: TypeAlias = Literal["allow", "deny_object", "deny_property"]
+ExpectedOutcome: TypeAlias = Literal["allow", "deny_object", "deny_property", "inconclusive"]
 
 
 class Verdict(str, Enum):
@@ -20,9 +20,11 @@ class Target:
     """Response target; paths use GraphQL response keys (including aliases)."""
 
     response_path: tuple[str | int, ...]
-    object_id: str | int
+    object_id: str | int | None
     property_name: str | None = None
     property_path: tuple[str | int, ...] = ()
+    owner_path: tuple[str | int, ...] = ()
+    expected_owner_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -59,10 +61,26 @@ class TestCaseLike(Protocol):
     description: str
     identity: Identity
     operation: str
-    target: Target
+    variables: Mapping[str, object]
+    target: Target | None
     expected_outcome: ExpectedOutcome
     evidence_requirements: tuple[str, ...]
     inconclusive_reason: str | None
+
+
+@dataclass(frozen=True)
+class TestCase:
+    """Canonical engine case created from the stable security corpus."""
+
+    test_id: str
+    description: str
+    identity: Identity
+    operation: str
+    variables: Mapping[str, object]
+    target: Target | None
+    expected_outcome: ExpectedOutcome
+    evidence_requirements: tuple[str, ...]
+    inconclusive_reason: str | None = None
 
 
 @dataclass(frozen=True)

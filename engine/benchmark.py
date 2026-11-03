@@ -45,8 +45,14 @@ def _load_integrations():
             missing.append(f"{module_name}.{function_name} ({exc})")
     if missing:
         raise IntegrationUnavailable("Required teammate integrations are missing: " + "; ".join(missing))
+    from engine.integration import adapt_configurations, adapt_corpus
     from policies.evaluator import evaluate_policy
-    return loaded["get_test_corpus"](), loaded["get_configurations"](), loaded["execute_graphql"], evaluate_policy
+    return (
+        adapt_corpus(loaded["get_test_corpus"]()),
+        adapt_configurations(loaded["get_configurations"]()),
+        loaded["execute_graphql"],
+        evaluate_policy,
+    )
 
 
 def _validate(corpus: Iterable[TestCaseLike], configurations: Iterable[Configuration]) -> tuple[tuple[TestCaseLike, ...], tuple[Configuration, ...]]:
@@ -65,9 +71,15 @@ def _validate(corpus: Iterable[TestCaseLike], configurations: Iterable[Configura
     for case in cases:
         if case.identity not in ("alice", "bob", "anonymous"):
             raise ValueError(f"{case.test_id} has unsupported identity {case.identity!r}")
-        if case.expected_outcome not in ("allow", "deny_object", "deny_property"):
+        if case.expected_outcome not in ("allow", "deny_object", "deny_property", "inconclusive"):
             raise ValueError(f"{case.test_id} has unsupported expected_outcome {case.expected_outcome!r}")
-        if not case.target.response_path or case.target.object_id is None:
+        if not isinstance(case.operation, str) or not case.operation.strip():
+            raise ValueError(f"{case.test_id} operation must be a non-empty GraphQL document")
+        if not isinstance(case.variables, dict) and not hasattr(case.variables, "items"):
+            raise ValueError(f"{case.test_id} variables must be a mapping")
+        if case.expected_outcome == "inconclusive":
+            continue
+        if case.target is None or not case.target.response_path or case.target.object_id is None:
             raise ValueError(f"{case.test_id} target requires response_path and object_id")
         if case.expected_outcome == "deny_property" and not (case.target.property_name or case.target.property_path):
             raise ValueError(f"{case.test_id} deny_property target requires a property path")
@@ -81,7 +93,7 @@ def run_benchmark(
     *,
     corpus: Iterable[TestCaseLike] | None = None,
     configurations: Iterable[Configuration] | None = None,
-    execute_graphql: Callable[[str, str, Configuration], GraphQLResponse] | None = None,
+    execute_graphql: Callable[[str, str, Configuration, dict[str, object]], GraphQLResponse] | None = None,
     policy_evaluator: Callable[[str, TestCaseLike, GraphQLResponse], Evaluation] | None = None,
 ) -> BenchmarkReport:
     """Run all 72 pairs. Missing integrations are reported, never fabricated."""
@@ -103,7 +115,7 @@ def run_benchmark(
             unit_started = perf_counter()
             response: GraphQLResponse | None = None
             try:
-                response = execute_graphql(case.operation, case.identity, config)
+                response = execute_graphql(case.operation, case.identity, config, dict(case.variables))
                 if not isinstance(response, GraphQLResponse):
                     raise TypeError("execute_graphql must return engine.contracts.GraphQLResponse")
                 evaluation = policy_evaluator(case.identity, case, response)

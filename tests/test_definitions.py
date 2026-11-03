@@ -34,7 +34,8 @@ class CanonicalCorpusTests(unittest.TestCase):
     def test_target_encodes_root_nested_and_property_scope(self) -> None:
         corpus = {case.test_id: case for case in get_test_corpus()}
         self.assertEqual((), corpus["T02"].target.object_path)
-        self.assertEqual(("customer",), corpus["T06"].target.object_path)
+        self.assertEqual("customer", corpus["T06"].target.resource_type)
+        self.assertEqual((), corpus["T06"].target.object_path)
         self.assertEqual("internalNotes", corpus["T10"].target.property_name)
         self.assertTrue(corpus["T04"].target.is_collection)
 

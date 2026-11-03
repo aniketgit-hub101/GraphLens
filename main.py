@@ -41,7 +41,11 @@ def main(argv: list[str] | None = None) -> int:
         print(f"GraphLens benchmark setup failed: {type(exc).__name__}: {exc}", file=sys.stderr)
         return 2
 
-    output = generate_report(report, args.output)
+    try:
+        output = generate_report(report, args.output)
+    except OSError as exc:
+        print(f"GraphLens could not write the JSON report to {args.output!r}: {exc}", file=sys.stderr)
+        return 2
     print(_render(report))
     print(f"JSON report: {output.resolve()}")
     return 1 if report.failed_units else 0

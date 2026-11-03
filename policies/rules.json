@@ -1,10 +1,11 @@
 {
   "version": 1,
-  "description": "Classification rules for observed GraphQL responses. Resource ownership expectations come from the reviewed test case, not benchmark configuration names.",
+  "description": "Classification rules for observed GraphQL responses. Resource expectations come from the test case, not benchmark configuration names.",
   "outcomes": {
-    "allow": "PASS only when the requested target (and required allowed property, if any) is evidenced; otherwise INCONCLUSIVE.",
-    "deny_object": "POLICY_VIOLATION when the target object is returned; PASS when absent/null without a relevant GraphQL error; otherwise INCONCLUSIVE.",
-    "deny_property": "POLICY_VIOLATION when the selected restricted property has a non-null returned value; PASS when withheld/null without a relevant GraphQL error; otherwise INCONCLUSIVE."
+    "allow": "PASS only when target and required property evidence is present; otherwise INCONCLUSIVE.",
+    "deny_object": "POLICY_VIOLATION when the target object is returned; PASS only for a selected, explicit denial response without relevant errors; missing evidence is INCONCLUSIVE.",
+    "deny_property": "POLICY_VIOLATION when a selected restricted property has a non-null value; PASS when selected and null without relevant errors; missing evidence is INCONCLUSIVE.",
+    "inconclusive": "Always classify as INCONCLUSIVE because the case itself declares evidence insufficient."
   },
   "verdicts": {
     "PASS": "Observed response satisfies the expected access policy.",

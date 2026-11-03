@@ -27,6 +27,7 @@ class Invoice(TypedDict):
     status: str
     internal_notes: str
     payment_reference: str
+    confidential_code: str
     customer_id: str
 
 
@@ -51,19 +52,19 @@ INVOICES: dict[str, Invoice] = {
         "id": "invoice-alice-001", "number": "INV-ALICE-001", "owner_id": "user-alice",
         "amount": 1250.00, "currency": "USD", "status": "PAID",
         "internal_notes": "Priority account; renewal discussion pending.",
-        "payment_reference": "PAY-ALICE-SECRET-001", "customer_id": "customer-alice",
+        "payment_reference": "PAY-ALICE-SECRET-001", "confidential_code": "CONF-ALICE-001", "customer_id": "customer-alice",
     },
     "invoice-alice-002": {
         "id": "invoice-alice-002", "number": "INV-ALICE-002", "owner_id": "user-alice",
         "amount": 89.50, "currency": "USD", "status": "OPEN",
         "internal_notes": "Discount approved by finance.",
-        "payment_reference": "PAY-ALICE-SECRET-002", "customer_id": "customer-alice",
+        "payment_reference": "PAY-ALICE-SECRET-002", "confidential_code": "CONF-ALICE-002", "customer_id": "customer-alice",
     },
     "invoice-bob-001": {
         "id": "invoice-bob-001", "number": "INV-BOB-001", "owner_id": "user-bob",
         "amount": 640.00, "currency": "USD", "status": "OVERDUE",
         "internal_notes": "Contact customer before escalation.",
-        "payment_reference": "PAY-BOB-SECRET-001", "customer_id": "customer-bob",
+        "payment_reference": "PAY-BOB-SECRET-001", "confidential_code": "CONF-BOB-001", "customer_id": "customer-bob",
     },
 }
 

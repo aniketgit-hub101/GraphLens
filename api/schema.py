@@ -34,6 +34,7 @@ type Invoice {
   customer: Customer!
   internalNotes: String
   paymentReference: String
+  confidentialCode: String
 }
 
 type Customer {
@@ -79,7 +80,10 @@ def _field_access_allowed(invoice: Invoice, context: Mapping[str, Any]) -> bool:
     config = context.get("config")
     if _mutant_enabled(config, "bopla", "auth_bypass", "property_authorization", "disable_property_authorization"):
         return True
-    return _object_access_allowed(invoice, context)
+    # Root BOLA and nested BOLA mutants affect object access only. They must not
+    # silently turn an owner-scoped property into a BOPLA mutant.
+    user = context.get("user")
+    return user is not None and invoice["owner_id"] == user["id"]
 
 
 def _visible_invoice(invoice: Invoice, context: Mapping[str, Any], scope: str = "root") -> bool:
@@ -136,6 +140,13 @@ def _resolve_restricted_invoice_field(invoice: Invoice, info: Any, field: str) -
     return invoice[field]
 
 
+def _resolve_confidential_code(invoice: Invoice, info: Any) -> str | None:
+    config = info.context.get("config")
+    if _mutant_enabled(config, "bopla", "auth_bypass", "property_authorization", "disable_property_authorization"):
+        return invoice["confidential_code"]
+    return None
+
+
 def _resolve_customer_email(customer: Customer, info: Any) -> str | None:
     return _resolve_customer_private_field(customer, info, "email")
 
@@ -170,6 +181,7 @@ _SCHEMA.type_map["Invoice"].fields["ownerId"].resolve = lambda invoice, _info: i
 _SCHEMA.type_map["Invoice"].fields["customer"].resolve = _resolve_invoice_customer
 _SCHEMA.type_map["Invoice"].fields["internalNotes"].resolve = lambda obj, info: _resolve_restricted_invoice_field(obj, info, "internal_notes")
 _SCHEMA.type_map["Invoice"].fields["paymentReference"].resolve = lambda obj, info: _resolve_restricted_invoice_field(obj, info, "payment_reference")
+_SCHEMA.type_map["Invoice"].fields["confidentialCode"].resolve = _resolve_confidential_code
 _SCHEMA.type_map["Customer"].fields["email"].resolve = _resolve_customer_email
 _SCHEMA.type_map["Customer"].fields["taxId"].resolve = _resolve_customer_tax_id
 

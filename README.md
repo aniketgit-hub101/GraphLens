@@ -1,70 +1,33 @@
 # GraphLens
 
-GraphLens is a policy-driven GraphQL authorization regression testing harness for detecting seeded Broken Object Level Authorization (BOLA) and Broken Object Property Level Authorization (BOPLA) defects. It evaluates returned GraphQL data against explicit authorization policy; HTTP 200 and successful GraphQL execution alone do not establish that access was authorized.
+GraphLens is a Python harness for regression testing GraphQL authorization against seeded BOLA and BOPLA defects. It executes a fixed synthetic API, evaluates returned data and structured GraphQL errors, and reports measured results. It is a controlled test fixture, not a production vulnerability scanner.
 
-The project is a controlled synthetic API demonstration, not a production vulnerability scanner. The current repository is an initial scaffold; the API, policy evaluator, fixed query corpus, mutants, benchmark engine, reports, and dashboard are not yet implemented. Do not treat placeholder output as benchmark evidence.
+## Backend
 
-## Technology and planned scope
+- `api/` implements deterministic invoice/customer data, the GraphQL schema, and the engine response adapter.
+- `tests/corpus.py` defines T01–T12; `mutants/` defines M1–M4 and C0–C5.
+- `engine/integration.py` adapts corpus/configuration objects to engine contracts.
+- `policies/` evaluates observed response evidence. Missing evidence and relevant errors remain `INCONCLUSIVE`.
+- `engine/benchmark.py` runs each test/configuration pair once and records execution failures separately from verdicts.
+- `engine/reporting.py` writes the measured report as JSON.
 
-- Python 3.11+
-- `graphql-core` for the synthetic GraphQL schema and query execution
-- `pytest` for deterministic authorization regression tests
-- `requests` for optional HTTP-based synthetic API integration
-- Flask only if a dashboard is justified after the CLI works
+There are exactly three verdicts: `PASS`, `POLICY_VIOLATION`, and `INCONCLUSIVE`. Expected outcomes describe policy intent; observed GraphQL responses determine verdicts.
 
-The planned benchmark uses Alice (invoice owner), Bob (authenticated non-owner), and Anonymous identities. Twelve fixed tests cover root-level BOLA, nested-object BOLA, and property-level BOPLA. Six configurations comprise the patched baseline, four independently switchable mutants, and the combined mutant configuration. The target size is 72 test/configuration units; result distributions must be measured from execution, not hardcoded.
-
-## Repository structure
-
-```text
-api/        Synthetic GraphQL schema, resolvers, and deterministic data
-policies/   Machine-readable access rules and evaluator
-tests/      Fixed query corpus and pytest checks
-mutants/    Independent seeded security mutants
-engine/     Query execution, verdicts, and benchmark orchestration
-reports/    Terminal and JSON reporting
-dashboard/  Optional future interface; CLI comes first
-results/    Generated benchmark output (not committed)
-docs/       Integration contracts, status, and design decisions
-main.py     Planned CLI entry point
-```
-
-Exactly three verdicts are planned: `PASS`, `POLICY_VIOLATION`, and `INCONCLUSIVE`. A violation requires evidence of an unauthorized object or restricted property in the returned data. Missing or unreliable evidence is inconclusive.
-
-## Team ownership
-
-| Teammate | Responsibility | Branch |
-| --- | --- | --- |
-| Aniket Gautam (`aniketgit-hub101`) | Project lead, core engine, integration | `main`, `feature/engine` |
-| Adeel Ahmad (`adeelad726`) | GraphQL API | `feature/graphql-api` |
-| Abhay Shukla (`abhyashukla16`) | Security tests and mutants | `feature/security-tests` |
-| Akash Bajpai | QA, documentation, and demonstration preparation | — |
-
-Coordinate shared interfaces in `docs/` before parallel implementation. Keep module ownership clear and review changes to shared contracts together. Akash coordinates QA and documentation without requiring a development laptop.
-
-## Setup
-
-Clone the central repository and install dependencies in a virtual environment:
+## Setup and run
 
 ```powershell
-git clone https://github.com/aniketgit-hub101/graphlens.git
-cd graphlens
 python -m venv .venv
 .venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt
+python -m compileall -q .
+python -m pytest -q
+python main.py
 ```
 
-The current scaffold does not yet provide a working benchmark command. Once implemented, the intended checks are `python -m pytest -q` and `python main.py`.
+The CLI runs the complete 72-unit matrix and writes the actual result to `results/latest.json`. Use `python main.py --output path/to/report.json` to select another JSON destination. `results/` contains generated output and is ignored by Git.
 
-## Branch workflow
+## Validation scope
 
-Each developer works on their assigned branch, commits only their changes, and opens a pull request to `main`. Before starting, fetch the latest refs and switch to the assigned branch:
+The corpus has 12 unique cases and six configurations: C0 baseline, C1 root BOLA (M1), C2 nested BOLA (M2), C3 BOPLA (M3), C4 authentication bypass (M4), and C5 all four mutants. Counts and runtimes are computed from each execution; no benchmark distribution is predetermined.
 
-```powershell
-git fetch origin
-git switch --track origin/feature/engine
-```
-
-Use `feature/graphql-api` for Adeel or `feature/security-tests` for Abhay. Before committing, inspect `git status` and stage only the files you changed. Keep `main` stable for integration and demonstration. Do not force-push shared branches.
-
-To propose work, open a pull request from the assigned branch to `main`; review and merge it before treating it as integrated. After `main` advances, update the feature branch with `git fetch origin` and `git merge origin/main`, resolve conflicts, and push the feature branch.
+The project is backend-only for this milestone. Dashboard and other UI work is deferred.

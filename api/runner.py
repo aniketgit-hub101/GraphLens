@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from collections.abc import Mapping
 from typing import Any
 
 from .schema import _SCHEMA
@@ -38,10 +39,15 @@ def _enabled_mutants(config: Any) -> set[str]:
     return set()
 
 
-def execute_graphql(query: str, identity: str, config: Any) -> GraphQLResponse:
+def execute_graphql(
+    query: str,
+    identity: str,
+    config: Any,
+    variables: Mapping[str, object] | None = None,
+) -> GraphQLResponse:
     """Execute a query and return engine-compatible data and GraphQL errors."""
     context = _build_context(identity, {"mutants": sorted(_enabled_mutants(config))})
-    result = graphql_sync(_SCHEMA, query, context_value=context)
+    result = graphql_sync(_SCHEMA, query, context_value=context, variable_values=dict(variables or {}))
     errors = tuple(
         GraphQLErrorInfo(
             message=error.message,

@@ -1,1 +1,1 @@
-"""Benchmark execution engine package. Implementation is not started yet."""
+"""GraphLens contracts, API adapters, benchmark runner, and reporting."""
