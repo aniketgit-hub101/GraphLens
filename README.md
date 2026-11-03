@@ -1,112 +1,70 @@
 # GraphLens
 
-GraphLens is a hackathon prototype for checking GraphQL object-level (BOLA) and property-level (BOPLA) authorization behavior against explicit policies. The repository currently contains its license and Python `.gitignore`; implementation work is expected to arrive through the feature branches below.
+GraphLens is a policy-driven GraphQL authorization regression testing harness for detecting seeded Broken Object Level Authorization (BOLA) and Broken Object Property Level Authorization (BOPLA) defects. It evaluates returned GraphQL data against explicit authorization policy; HTTP 200 and successful GraphQL execution alone do not establish that access was authorized.
+
+The project is a controlled synthetic API demonstration, not a production vulnerability scanner. The current repository is an initial scaffold; the API, policy evaluator, fixed query corpus, mutants, benchmark engine, reports, and dashboard are not yet implemented. Do not treat placeholder output as benchmark evidence.
+
+## Technology and planned scope
+
+- Python 3.11+
+- `graphql-core` for the synthetic GraphQL schema and query execution
+- `pytest` for deterministic authorization regression tests
+- `requests` for optional HTTP-based synthetic API integration
+- Flask only if a dashboard is justified after the CLI works
+
+The planned benchmark uses Alice (invoice owner), Bob (authenticated non-owner), and Anonymous identities. Twelve fixed tests cover root-level BOLA, nested-object BOLA, and property-level BOPLA. Six configurations comprise the patched baseline, four independently switchable mutants, and the combined mutant configuration. The target size is 72 test/configuration units; result distributions must be measured from execution, not hardcoded.
+
+## Repository structure
+
+```text
+api/        Synthetic GraphQL schema, resolvers, and deterministic data
+policies/   Machine-readable access rules and evaluator
+tests/      Fixed query corpus and pytest checks
+mutants/    Independent seeded security mutants
+engine/     Query execution, verdicts, and benchmark orchestration
+reports/    Terminal and JSON reporting
+dashboard/  Optional future interface; CLI comes first
+results/    Generated benchmark output (not committed)
+docs/       Integration contracts, status, and design decisions
+main.py     Planned CLI entry point
+```
+
+Exactly three verdicts are planned: `PASS`, `POLICY_VIOLATION`, and `INCONCLUSIVE`. A violation requires evidence of an unauthorized object or restricted property in the returned data. Missing or unreliable evidence is inconclusive.
 
 ## Team ownership
 
 | Teammate | Responsibility | Branch |
 | --- | --- | --- |
-| Aniket (`aniketgit-hub101`) | Engine and integration | `feature/engine` |
-| Adeel (`adeelad726`) | GraphQL API | `feature/graphql-api` |
-| Abhay (`abhyashukla16`) | Security tests | `feature/security-tests` |
-| Akash | Test scenarios, QA coordination, documentation, and demo support | — |
+| Aniket Gautam (`aniketgit-hub101`) | Project lead, core engine, integration | `main`, `feature/engine` |
+| Adeel Ahmad (`adeelad726`) | GraphQL API | `feature/graphql-api` |
+| Abhay Shukla (`abhyashukla16`) | Security tests and mutants | `feature/security-tests` |
+| Akash Bajpai | QA, documentation, and demonstration preparation | — |
 
-## Shared branch workflow
+Coordinate shared interfaces in `docs/` before parallel implementation. Keep module ownership clear and review changes to shared contracts together. Akash coordinates QA and documentation without requiring a development laptop.
 
-- `main` is the stable integration branch. Keep it ready to run and demo.
-- Each laptop uses its owner's feature branch. Do not commit feature work directly to `main`.
-- Open a pull request from the feature branch into `main`; review and merge it before treating the work as integrated.
-- Each person should clone the repository on their own laptop. Do not share a working directory between laptops.
+## Setup
 
-## First setup on each laptop
-
-Clone the same repository, then check out your assigned branch. The three feature branches are published in this repository.
+Clone the central repository and install dependencies in a virtual environment:
 
 ```powershell
-git clone https://github.com/aniketgit-hub101/GraphLens.git
-cd GraphLens
+git clone https://github.com/aniketgit-hub101/graphlens.git
+cd graphlens
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
 ```
 
-Run the one command under your name only:
+The current scaffold does not yet provide a working benchmark command. Once implemented, the intended checks are `python -m pytest -q` and `python main.py`.
 
-**Aniket:**
+## Branch workflow
 
-```powershell
-git switch --track origin/feature/engine
-```
-
-**Adeel:**
-
-```powershell
-git switch --track origin/feature/graphql-api
-```
-
-**Abhay:**
-
-```powershell
-git switch --track origin/feature/security-tests
-```
-
-If you cloned before your branch was published, create it from `main` and publish it once. For example, Aniket runs:
-
-```powershell
-git switch --create feature/engine origin/main
-git push --set-upstream origin feature/engine
-```
-
-Use your assigned branch name in place of `feature/engine`. Run the checkout command once per clone.
-
-## Daily work
-
-Before editing, switch to your branch and pull its latest commits:
-
-```powershell
-git switch feature/graphql-api
-git pull --ff-only
-```
-
-Replace the branch name with your assignment. To bring in changes already merged to `main`:
+Each developer works on their assigned branch, commits only their changes, and opens a pull request to `main`. Before starting, fetch the latest refs and switch to the assigned branch:
 
 ```powershell
 git fetch origin
-git merge origin/main
+git switch --track origin/feature/engine
 ```
 
-Resolve any conflicts, then save and publish your work:
+Use `feature/graphql-api` for Adeel or `feature/security-tests` for Abhay. Before committing, inspect `git status` and stage only the files you changed. Keep `main` stable for integration and demonstration. Do not force-push shared branches.
 
-```powershell
-git status --short
-git add <files-you-changed>
-git commit -m "Describe the change"
-git push
-```
-
-Use `git status` before committing so you do not include another teammate's work by mistake.
-
-## Pull requests and merging
-
-Create a pull request with GitHub CLI (`gh`):
-
-```powershell
-gh pr create --base main --head feature/graphql-api --fill
-```
-
-Replace the head branch with your assignment. If `gh` is not installed, open the repository on GitHub, choose **Compare & pull request** for your branch, and set the base branch to `main`.
-
-After review, the integrator can merge the pull request with:
-
-```powershell
-gh pr merge <PR_NUMBER> --squash
-```
-
-Or use **Merge pull request** on GitHub. After the merge, sync your clone:
-
-```powershell
-git switch main
-git pull --ff-only origin main
-git switch feature/graphql-api
-git merge main
-git push
-```
-
-Replace `feature/graphql-api` with your assignment. Keep the Python `.gitignore` in place; it already excludes bytecode, virtual environments, test caches, coverage output, and `.env` files.
+To propose work, open a pull request from the assigned branch to `main`; review and merge it before treating it as integrated. After `main` advances, update the feature branch with `git fetch origin` and `git merge origin/main`, resolve conflicts, and push the feature branch.
