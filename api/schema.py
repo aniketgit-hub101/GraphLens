@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
-from graphql import GraphQLError, build_schema, graphql_sync
+from graphql import build_schema
 
 from .data import CUSTOMERS, INVOICES, USERS, Customer, Invoice, User, identity_user
 
@@ -47,6 +47,17 @@ type Customer {
 
 _SCHEMA = build_schema(SCHEMA_SDL)
 
+_IDENTITIES = frozenset({"alice", "bob", "anonymous"})
+
+
+def normalize_identity(identity: object) -> str:
+    """Return a supported normalized identity or reject the input."""
+    if not isinstance(identity, str):
+        raise TypeError("identity must be a string")
+    if identity not in _IDENTITIES:
+        raise ValueError(f"unknown identity or non-canonical identity value: {identity!r}")
+    return identity
+
 
 def _enabled_mutants(config: Mapping[str, Any] | None) -> set[str]:
     if not config:
@@ -64,21 +75,31 @@ def _mutant_enabled(config: Mapping[str, Any], *names: str) -> bool:
     return any(name.casefold().replace("-", "_") in active for name in names)
 
 
+def _anonymous_m4_enabled(context: Mapping[str, Any]) -> bool:
+    return context.get("identity") == "anonymous" and _mutant_enabled(context.get("config"), "AUTH_BYPASS")
+
+
+def _is_authenticated(context: Mapping[str, Any]) -> bool:
+    return context.get("user") is not None or _anonymous_m4_enabled(context)
+
+
 def _object_access_allowed(invoice: Invoice, context: Mapping[str, Any], scope: str = "root") -> bool:
     config = context.get("config")
-    if _mutant_enabled(config, "auth_bypass"):
+    if _anonymous_m4_enabled(context):
         return True
-    if scope == "nested" and _mutant_enabled(config, "nested_bola", "bola", "object_authorization", "disable_object_authorization"):
+    if scope == "nested" and _mutant_enabled(config, "NESTED_BOLA"):
         return True
-    if scope == "root" and _mutant_enabled(config, "root_bola", "bola", "object_authorization", "disable_object_authorization"):
+    if scope == "root" and _mutant_enabled(config, "ROOT_BOLA"):
         return True
     user = context.get("user")
-    return user is not None and invoice["owner_id"] == user["id"]
+    return user is not None and (
+        invoice["owner_id"] == user["id"] or user["id"] in invoice["viewer_ids"]
+    )
 
 
 def _field_access_allowed(invoice: Invoice, context: Mapping[str, Any]) -> bool:
     config = context.get("config")
-    if _mutant_enabled(config, "bopla", "auth_bypass", "property_authorization", "disable_property_authorization"):
+    if _mutant_enabled(config, "BOPLA"):
         return True
     # Root BOLA and nested BOLA mutants affect object access only. They must not
     # silently turn an owner-scoped property into a BOPLA mutant.
@@ -87,8 +108,7 @@ def _field_access_allowed(invoice: Invoice, context: Mapping[str, Any]) -> bool:
 
 
 def _visible_invoice(invoice: Invoice, context: Mapping[str, Any], scope: str = "root") -> bool:
-    authenticated = context.get("user") is not None
-    if not authenticated and not _mutant_enabled(context.get("config"), "auth_bypass"):
+    if not _is_authenticated(context):
         return False
     return _object_access_allowed(invoice, context, scope)
 
@@ -103,9 +123,9 @@ def _resolve_invoice(_root: Any, info: Any, id: str) -> Invoice | None:
 
 
 def _resolve_invoices(_root: Any, info: Any) -> list[Invoice]:
-    if info.context.get("user") is None:
+    if not _is_authenticated(info.context):
         return []
-    return [invoice for invoice in INVOICES.values() if _visible_invoice(invoice, info.context)]
+    return [invoice for invoice in INVOICES.values() if _visible_invoice(invoice, info.context, "collection")]
 
 
 def _resolve_customer(_root: Any, info: Any, id: str) -> Customer | None:
@@ -142,7 +162,7 @@ def _resolve_restricted_invoice_field(invoice: Invoice, info: Any, field: str) -
 
 def _resolve_confidential_code(invoice: Invoice, info: Any) -> str | None:
     config = info.context.get("config")
-    if _mutant_enabled(config, "bopla", "auth_bypass", "property_authorization", "disable_property_authorization"):
+    if _mutant_enabled(config, "BOPLA"):
         return invoice["confidential_code"]
     return None
 
@@ -156,7 +176,7 @@ def _resolve_customer_tax_id(customer: Customer, info: Any) -> str | None:
 
 
 def _resolve_customer_private_field(customer: Customer, info: Any, field: str) -> str | None:
-    if _mutant_enabled(info.context.get("config"), "bopla", "auth_bypass", "property_authorization", "disable_property_authorization"):
+    if _mutant_enabled(info.context.get("config"), "BOPLA"):
         return customer[field]
     user = info.context.get("user")
     owns_customer = user is not None and any(
@@ -167,8 +187,9 @@ def _resolve_customer_private_field(customer: Customer, info: Any, field: str) -
 
 
 def _build_context(identity: str, config: Mapping[str, Any] | None) -> dict[str, Any]:
-    user = None if isinstance(identity, str) and identity.casefold() == "anonymous" else identity_user(identity)
-    return {"user": user, "config": config or {}}
+    normalized_identity = normalize_identity(identity)
+    user = None if normalized_identity == "anonymous" else identity_user(normalized_identity)
+    return {"user": user, "identity": normalized_identity, "config": config or {}}
 
 
 _SCHEMA.type_map["Query"].fields["me"].resolve = _resolve_me
@@ -189,23 +210,15 @@ _SCHEMA.type_map["Customer"].fields["taxId"].resolve = _resolve_customer_tax_id
 def execute_graphql(
     query: str,
     identity: str,
-    config: Mapping[str, Any] | None,
+    config: Any,
+    variables: Mapping[str, object] | None = None,
 ) -> dict[str, Any]:
-    """Execute GraphQL and return a stable ``data/errors/status`` result.
+    """Compatibility adapter returning the legacy data/errors/status mapping."""
+    from .runner import execute_graphql as execute_with_contract
 
-    ``identity`` accepts ``Alice``, ``Bob``, ``Anonymous`` (or user IDs).
-    ``config`` may include any of ``ROOT_BOLA``, ``NESTED_BOLA``, ``BOPLA``,
-    or ``AUTH_BYPASS`` in its ``mutants`` list to disable that C0 check.
-    The legacy ``BOLA`` name enables both object-level BOLA mutants.
-    """
-    if not isinstance(query, str):
-        return {"data": None, "errors": ["query must be a string"], "status": "error"}
-    context = _build_context(identity, config)
-    user = context["user"]
-    if user is None and identity.casefold() != "anonymous":
-        return {"data": None, "errors": [f"unknown identity: {identity}"], "status": "error"}
-
-    result = graphql_sync(_SCHEMA, query, context_value=context)
-    errors = [error.message for error in result.errors] if result.errors else []
-    status = "error" if errors and result.data is None else "partial" if errors else "success"
-    return {"data": result.data, "errors": errors, "status": status}
+    # Preserve historical title-case aliases only at this legacy boundary.
+    legacy_identity = identity.casefold() if isinstance(identity, str) else identity
+    response = execute_with_contract(query, legacy_identity, config, variables)
+    errors = [error.message for error in response.errors]
+    status = "error" if errors and response.data is None else "partial" if errors else "success"
+    return {"data": response.data, "errors": errors, "status": status}

@@ -92,8 +92,12 @@ def test_full_real_benchmark_accounts_and_serializes_all_pairs(tmp_path):
     t04_rows = [row for row in report.results if row.test_id == "T04"]
     assert len(t04_rows) == 6
     assert {row.configuration_id for row in t04_rows} == {f"C{i}" for i in range(6)}
-    assert all(row.verdict is Verdict.INCONCLUSIVE for row in t04_rows)
-    assert all(any("cannot establish an object-level decision" in item for item in row.evidence) for row in t04_rows)
+    t04_by_config = {row.configuration_id: row for row in t04_rows}
+    assert all(t04_by_config[f"C{i}"].verdict is Verdict.INCONCLUSIVE for i in range(4))
+    assert all(t04_by_config[f"C{i}"].verdict is Verdict.POLICY_VIOLATION for i in (4, 5))
+    assert all(any("cannot establish an object-level decision" in item for item in t04_by_config[f"C{i}"].evidence) for i in range(4))
+    assert all(any("protected collection object IDs" in item for item in t04_by_config[f"C{i}"].evidence) for i in (4, 5))
+    assert report.gate_status == "PASSED"
 
     destination = generate_report(report, tmp_path / "actual-report.json")
     serialized = json.loads(destination.read_text(encoding="utf-8"))

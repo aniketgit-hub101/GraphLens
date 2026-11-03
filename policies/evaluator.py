@@ -115,6 +115,41 @@ def _evidence(case: Any, response: GraphQLResponse, actual: str) -> tuple[str, .
     return (actual,) + tuple(f"GraphQL error: {message}" for message in messages)
 
 
+def _evaluate_collection(
+    identity: str,
+    case: Any,
+    target: Any,
+    response: GraphQLResponse,
+    expected: str,
+) -> Evaluation:
+    response_path = tuple(_get(target, "response_path", ()))
+    reason = _get(case, "inconclusive_reason")
+    reason_text = f"; {reason}" if reason else ""
+    if response.data is None:
+        return Evaluation(Verdict.INCONCLUSIVE, _evidence(case, response, "No collection data is available" + reason_text), expected, "collection data missing")
+    if not _contains_path(response.data, response_path):
+        return Evaluation(Verdict.INCONCLUSIVE, _evidence(case, response, "Collection response path is missing" + reason_text), expected, "collection path missing")
+    values = _at_path(response.data, response_path)
+    if values is None:
+        return Evaluation(Verdict.INCONCLUSIVE, _evidence(case, response, "Collection value is null" + reason_text), expected, "null collection")
+    if not isinstance(values, Sequence) or isinstance(values, (str, bytes)):
+        return Evaluation(Verdict.INCONCLUSIVE, _evidence(case, response, "Collection value has an invalid shape" + reason_text), expected, "malformed collection")
+    if not values:
+        return Evaluation(Verdict.INCONCLUSIVE, _evidence(case, response, "Collection is empty; no object-level decision is evidenced" + reason_text), expected, "empty collection")
+
+    id_field = str(_get(target, "object_id_field", "id"))
+    object_ids: list[object] = []
+    for value in values:
+        if not isinstance(value, Mapping) or id_field not in value or value[id_field] is None:
+            return Evaluation(Verdict.INCONCLUSIVE, _evidence(case, response, "Collection contains malformed or unidentified object evidence" + reason_text), expected, "malformed collection object")
+        object_ids.append(value[id_field])
+
+    if _get(target, "requires_authentication", False) and identity == "anonymous":
+        detail = f"Anonymous identity received protected collection object IDs {object_ids!r}"
+        return Evaluation(Verdict.POLICY_VIOLATION, _evidence(case, response, detail), expected, "unauthorized collection returned")
+    return Evaluation(Verdict.INCONCLUSIVE, _evidence(case, response, "Non-empty collection does not prove an unauthorized object" + reason_text), expected, "collection authorization unclear")
+
+
 def evaluate_policy(identity: str, operation: TestCaseLike, response: GraphQLResponse) -> Evaluation:
     """Classify observed data; HTTP status and execution success alone do not prove access.
 
@@ -128,11 +163,11 @@ def evaluate_policy(identity: str, operation: TestCaseLike, response: GraphQLRes
     inconclusive_reason = _get(case, "inconclusive_reason")
     if case_identity is not None and case_identity != identity:
         return Evaluation(Verdict.INCONCLUSIVE, ("Evaluator identity does not match the case identity",), expected, "identity mismatch")
-    if inconclusive_reason:
-        return Evaluation(Verdict.INCONCLUSIVE, (str(inconclusive_reason),), expected, "case designated inconclusive")
-    if expected == "inconclusive":
-        return Evaluation(Verdict.INCONCLUSIVE, ("Case policy explicitly requires an inconclusive classification",), expected, "case outcome is inconclusive")
-    if expected not in _RULES["outcomes"] or target is None:
+    if expected not in _RULES["outcomes"]:
+        return Evaluation(Verdict.INCONCLUSIVE, ("Case has an unsupported expected outcome",), expected, "unclassified case")
+    if target is not None and _get(target, "is_collection", False):
+        return _evaluate_collection(identity, case, target, response, expected)
+    if target is None:
         return Evaluation(Verdict.INCONCLUSIVE, ("Case lacks a supported expected outcome or target description",), expected, "unclassified case")
 
     response_path = tuple(_get(target, "response_path", ()))
@@ -192,7 +227,7 @@ def evaluate_policy(identity: str, operation: TestCaseLike, response: GraphQLRes
         if target_object is None:
             if _has_relevant_error(response.errors, response_path):
                 return Evaluation(Verdict.INCONCLUSIVE, _evidence(case, response, "Parent object is absent with a relevant GraphQL error"), expected, "parent unavailable with relevant error")
-            return Evaluation(Verdict.PASS, _evidence(case, response, "Parent object was withheld; restricted property was not exposed"), expected, "parent absent")
+            return Evaluation(Verdict.INCONCLUSIVE, _evidence(case, response, "Parent object is absent; property-level denial cannot be established"), expected, "parent absent")
         if not property_path:
             return Evaluation(Verdict.INCONCLUSIVE, _evidence(case, response, "Restricted property path is missing from the case target"), expected, "property path missing")
         property_present = _contains_path(target_object, property_path)

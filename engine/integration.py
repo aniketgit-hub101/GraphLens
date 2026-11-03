@@ -4,6 +4,7 @@ from __future__ import annotations
 from typing import Iterable
 
 from engine.contracts import Configuration, Target, TestCase
+from mutants.configurations import normalize_configuration
 
 _OWNER_IDS = {"alice": "user-alice", "bob": "user-bob"}
 
@@ -21,7 +22,18 @@ def adapt_test_case(source: object) -> TestCase:
     outcome = getattr(raw_outcome, "value", raw_outcome)
     category = getattr(getattr(source, "category", ""), "value", getattr(source, "category", ""))
 
-    if outcome == "inconclusive" or getattr(raw_target, "is_collection", False):
+    if getattr(raw_target, "is_collection", False):
+        expected_outcome = "inconclusive"
+        collection_field = getattr(raw_target, "collection_field", None)
+        if not collection_field:
+            raise ValueError(f"{getattr(source, 'test_id', '<unknown>')} collection target requires collection_field")
+        target = Target(
+            response_path=(str(collection_field),),
+            object_id=None,
+            is_collection=True,
+            requires_authentication=True,
+        )
+    elif outcome == "inconclusive":
         expected_outcome = "inconclusive"
         target = None
     else:
@@ -75,9 +87,4 @@ def adapt_corpus(corpus: Iterable[object]) -> tuple[TestCase, ...]:
 
 def adapt_configurations(configurations: Iterable[object]) -> tuple[Configuration, ...]:
     """Normalize the mutant package's id/set objects to engine configurations."""
-    normalized = []
-    for source in configurations:
-        configuration_id = str(getattr(source, "configuration_id", getattr(source, "id", "")))
-        enabled_mutants = frozenset(str(item) for item in getattr(source, "enabled_mutants"))
-        normalized.append(Configuration(configuration_id, configuration_id, enabled_mutants))
-    return tuple(normalized)
+    return tuple(normalize_configuration(source) for source in configurations)

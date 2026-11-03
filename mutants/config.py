@@ -3,6 +3,8 @@
 from dataclasses import dataclass
 from typing import Final
 
+from engine.contracts import Configuration
+
 
 @dataclass(frozen=True, slots=True)
 class Mutant:
@@ -10,12 +12,6 @@ class Mutant:
     name: str
     target: str
     behavior: str
-
-
-@dataclass(frozen=True, slots=True)
-class Configuration:
-    configuration_id: str
-    enabled_mutants: frozenset[str]
 
 
 MUTANTS: Final[tuple[Mutant, ...]] = (
@@ -27,12 +23,12 @@ MUTANTS: Final[tuple[Mutant, ...]] = (
 MUTANT_IDS: Final[frozenset[str]] = frozenset(mutant.mutant_id for mutant in MUTANTS)
 
 CONFIGURATIONS: Final[tuple[Configuration, ...]] = (
-    Configuration("C0", frozenset()),
-    Configuration("C1", frozenset({"M1"})),
-    Configuration("C2", frozenset({"M2"})),
-    Configuration("C3", frozenset({"M3"})),
-    Configuration("C4", frozenset({"M4"})),
-    Configuration("C5", frozenset({"M1", "M2", "M3", "M4"})),
+    Configuration("C0", "Patched baseline", frozenset()),
+    Configuration("C1", "Root BOLA (M1)", frozenset({"M1"})),
+    Configuration("C2", "Nested BOLA (M2)", frozenset({"M2"})),
+    Configuration("C3", "BOPLA (M3)", frozenset({"M3"})),
+    Configuration("C4", "Authentication bypass (M4)", frozenset({"M4"})),
+    Configuration("C5", "Combined mutants", frozenset({"M1", "M2", "M3", "M4"})),
 )
 
 CONFIGS_BY_ID: Final[dict[str, Configuration]] = {

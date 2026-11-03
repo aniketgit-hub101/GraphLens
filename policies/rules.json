@@ -5,7 +5,7 @@
     "allow": "PASS only when target and required property evidence is present; otherwise INCONCLUSIVE.",
     "deny_object": "POLICY_VIOLATION when the target object is returned; PASS only for a selected, explicit denial response without relevant errors; missing evidence is INCONCLUSIVE.",
     "deny_property": "POLICY_VIOLATION when a selected restricted property has a non-null value; PASS when selected and null without relevant errors; missing evidence is INCONCLUSIVE.",
-    "inconclusive": "Always classify as INCONCLUSIVE because the case itself declares evidence insufficient."
+    "inconclusive": "Classify from observed evidence. Empty, null, malformed, or insufficient collection data is INCONCLUSIVE; a non-empty protected collection returned to an anonymous identity is POLICY_VIOLATION."
   },
   "verdicts": {
     "PASS": "Observed response satisfies the expected access policy.",

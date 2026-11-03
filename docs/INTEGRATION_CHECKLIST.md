@@ -1,6 +1,6 @@
 # GraphLens backend integration checklist
 
-Branch `integration/mvp`; backend-only scope. No UI components are part of this milestone.
+Branch `fix/security-audit`, based on the preserved `integration/mvp` release checkpoint; backend-only scope. No UI components are part of this milestone.
 
 ## Interface and source checks
 
@@ -10,6 +10,8 @@ Branch `integration/mvp`; backend-only scope. No UI components are part of this 
 - [x] Configurations C0–C5 map to no mutants, M1, M2, M3, M4, and all four respectively.
 - [x] All corpus operations validate against the actual GraphQL schema.
 - [x] Missing response paths/properties and relevant errors remain INCONCLUSIVE.
+- [x] Invalid identities, malformed configurations, duplicate mutant entries, and unknown mutants are rejected.
+- [x] The behavioral gate verifies declared mutant kills, unexpected violation cells, resolver bindings, and all unique pairs.
 - [x] Evidence output reports observed facts, not requirement labels presented as proof.
 
 ## Real API security checks
@@ -30,13 +32,14 @@ Branch `integration/mvp`; backend-only scope. No UI components are part of this 
 - [x] Runtime is measured with `perf_counter`; no expected distribution is hardcoded.
 - [x] JSON output generated at `results/latest.json` and checked for reconciliation.
 
-Measured latest run: 72 rows, 0 execution failures, 51 PASS, 15 POLICY_VIOLATION, 6 INCONCLUSIVE; 62.797 ms wall runtime. T04 accounts for the six INCONCLUSIVE rows.
+Measured latest run: 72 rows, 0 execution failures, 54 PASS, 14 POLICY_VIOLATION, 4 INCONCLUSIVE; 54.312 ms measured runtime; gate PASSED. T04 is INCONCLUSIVE under C0–C3 because the returned collection is empty, and POLICY_VIOLATION under C4–C5 because protected invoice IDs are actually returned to anonymous.
 
 ## Validation
 
 - [x] `python -m compileall -q .`
-- [x] `python -m pytest -q` — 29 passed, 12 subtests passed.
-- [x] `python main.py` — successful 72-unit run.
+- [x] `python -m pytest -q` — 58 passed, 12 subtests passed.
+- [x] `python main.py` — successful 72-unit run with gate PASSED.
+- [x] Failed-gate and setup-error CLI paths write `gate=FAILED` JSON and return nonzero.
 - [x] CLI report-write failure path returns nonzero and reports the destination error.
 
 `results/latest.json` is generated output and is ignored by Git. See `docs/INTEGRATION_CONTRACT.md` and `docs/architecture.md` for the current boundary and design.

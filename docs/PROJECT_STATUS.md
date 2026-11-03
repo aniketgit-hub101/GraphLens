@@ -1,31 +1,26 @@
 # GraphLens project status
 
-Snapshot: 2026-11-03. Release candidate branch: `integration/mvp`. The backend MVP is ready for review before UI development; this work does not modify `main`.
+Snapshot: 2026-11-03. Security corrections are under local validation on `fix/security-audit`, based on the preserved `integration/mvp` release commit `ef2758c535bcf63f6fa8cb883496d82dec7558f5`. No merge or push is part of this work.
 
-## Completed backend
+## Backend corrections
 
-- Deterministic GraphQL invoice/customer API with structured response data and error paths.
-- Canonical adapters for the fixed corpus and configurations, with GraphQL variable forwarding.
-- Four independently switchable mutants: root BOLA, nested BOLA, BOPLA, and authentication bypass.
-- Evidence-based evaluator with `PASS`, `POLICY_VIOLATION`, and `INCONCLUSIVE`. Missing paths and relevant errors do not become PASS.
-- Benchmark runner with exact 72-pair accounting, measured runtimes, and execution failures separate from verdicts.
-- Terminal CLI, JSON output, error handling, real API/evaluator integration tests, and updated backend documentation.
-- Dashboard, frontend, Flask, and visual components remain outside this backend milestone.
+- Canonical strict configuration and identity validation rejects unknown names, duplicate mutants, malformed inputs, and unsupported identities.
+- M1, M2, M3, and M4 are isolated to root BOLA, nested BOLA, property exposure, and anonymous authentication bypass respectively.
+- T10 uses a shared invoice so Bob's parent access is independently evidenced from `internalNotes`; T12 continues to deny `confidentialCode` to its owner unless M3 is enabled.
+- The evaluator uses actual response evidence. Missing parent/property evidence and relevant GraphQL errors remain `INCONCLUSIVE`; T04 evaluates real collection evidence.
+- The behavioral benchmark gate checks declared mutant kills, unexpected vulnerability cells, cross-mutant contamination, resolver bindings, strict invalid-input rejection, execution failures, and exact pair accounting.
+- CLI setup and gate failures produce a JSON report with `gate.status = FAILED` and nonzero exit status. No UI components are included.
 
-## Final validation
+## Latest measured validation
 
-- `python -m compileall -q .`: passed.
-- `python -m pytest -q`: 29 passed, 12 subtests passed.
-- `python -m pytest api/tests -v`: 12 passed.
-- `python main.py`: 72/72 pairs, zero execution failures; 51 PASS, 15 POLICY_VIOLATION, 6 INCONCLUSIVE; measured runtime 62.797 ms.
-- Report audit: 12 unique tests, 6 unique configurations, 72 unique pairs; every configuration has 12 rows and counts reconcile to the result rows.
-- T04 is explicitly INCONCLUSIVE in all configurations, with its object-level evidence limitation recorded in each result.
-- JSON report: `results/latest.json`.
-- CLI report-write error path returns nonzero and reports the destination problem.
+- `python main.py`: 72/72 unique test/configuration units, zero execution failures, gate PASSED; 54 PASS, 14 POLICY_VIOLATION, 4 INCONCLUSIVE; measured runtime 54.312 ms.
+- Matrix audit: 12 unique tests × 6 unique configurations; all 72 pairs occur once. T04 is INCONCLUSIVE for C0–C3 with empty collection evidence and POLICY_VIOLATION for C4–C5 with returned protected invoice IDs.
+- Representative observed violations include T02/C1 and T06/C2 unauthorized objects, T10/C3 and T12/C3 non-null restricted properties, and T04/C4 anonymous collection disclosure.
+- Focused suites last run: `python -m pytest api/tests -v` — 26 passed; `python -m pytest engine -v` — 22 passed; `python -m pytest tests/test_definitions.py -q` — 4 passed, 12 subtests passed.
+- `python -m compileall -q .`: passed. `python -m pytest -q`: 58 passed, 12 subtests passed.
 
-## Remaining limitations
+## Limitations
 
-- The API is a deterministic in-process fixture, not a deployed HTTP service.
-- T04 intentionally has no single-object target; the empty collection response cannot establish an object-level decision.
+The API is a deterministic in-process GraphQL fixture rather than a deployed HTTP service. T04 detects a non-empty returned protected collection; an empty collection cannot prove per-object authorization and remains inconclusive.
 
-Generated benchmark output under `results/` is ignored by Git. The backend release commit and push target `integration/mvp`; `main` remains untouched.
+Generated benchmark output under `results/` is ignored by Git. Nothing has been committed, merged, or pushed.

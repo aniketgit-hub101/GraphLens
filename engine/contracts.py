@@ -25,6 +25,9 @@ class Target:
     property_path: tuple[str | int, ...] = ()
     owner_path: tuple[str | int, ...] = ()
     expected_owner_id: str | None = None
+    is_collection: bool = False
+    requires_authentication: bool = False
+    object_id_field: str = "id"
 
 
 @dataclass(frozen=True)
@@ -95,6 +98,7 @@ class BenchmarkResult:
     runtime_ms: float
     graphql_errors: tuple[GraphQLErrorInfo, ...] = ()
     execution_error: str | None = None
+    response_data: Mapping[str, object] | None = None
 
     def to_dict(self) -> dict[str, object]:
         value = asdict(self)
@@ -107,6 +111,8 @@ class BenchmarkReport:
     results: tuple[BenchmarkResult, ...]
     expected_units: int
     runtime_ms: float
+    gate_status: str = "NOT_RUN"
+    gate_findings: tuple[str, ...] = ()
 
     @property
     def counts(self) -> dict[str, int]:
@@ -143,6 +149,7 @@ class BenchmarkReport:
                 "counts": self.counts,
                 "runtime_ms": round(self.runtime_ms, 3),
             },
+            "gate": {"status": self.gate_status, "findings": list(self.gate_findings)},
             "configurations": self.per_configuration(),
             "results": [result.to_dict() for result in self.results],
         }

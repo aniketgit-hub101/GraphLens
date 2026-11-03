@@ -42,6 +42,12 @@ def test_denied_property_missing_parent_path_is_inconclusive():
     assert result.verdict is Verdict.INCONCLUSIVE
 
 
+def test_denied_property_absent_parent_is_inconclusive():
+    case = _case("deny_property", property_name="internalNotes")
+    result = evaluate_policy("bob", case, GraphQLResponse({"invoice": None}))
+    assert result.verdict is Verdict.INCONCLUSIVE
+
+
 def test_denied_property_selected_null_is_pass():
     case = _case("deny_property", property_name="internalNotes")
     result = evaluate_policy("bob", case, GraphQLResponse({"invoice": {"id": "invoice-alice-001", "internalNotes": None}}))
@@ -54,7 +60,40 @@ def test_denied_property_non_null_value_is_violation():
     assert result.verdict is Verdict.POLICY_VIOLATION
 
 
-def test_case_with_inconclusive_outcome_does_not_need_an_object_target():
+def _collection_case():
+    return SimpleNamespace(
+        test_id="T04", identity="anonymous", expected_outcome="inconclusive",
+        target=Target(("invoices",), None, is_collection=True, requires_authentication=True),
+        evidence_requirements=("collection evidence",),
+        inconclusive_reason="An empty collection cannot establish an object-level decision.",
+    )
+
+
+def test_t04_empty_collection_is_inconclusive_for_evidence_reasons():
+    result = evaluate_policy("anonymous", _collection_case(), GraphQLResponse({"invoices": []}))
+    assert result.verdict is Verdict.INCONCLUSIVE
+    assert "empty" in result.evidence[0].casefold()
+    assert "object-level decision" in result.evidence[0]
+
+
+def test_t04_null_collection_is_inconclusive():
+    result = evaluate_policy("anonymous", _collection_case(), GraphQLResponse({"invoices": None}))
+    assert result.verdict is Verdict.INCONCLUSIVE
+
+
+def test_t04_nonempty_collection_is_violation_despite_inconclusive_policy_intent():
+    response = GraphQLResponse({"invoices": [{"id": "invoice-alice-001", "ownerId": "user-alice"}]})
+    result = evaluate_policy("anonymous", _collection_case(), response)
+    assert result.verdict is Verdict.POLICY_VIOLATION
+    assert "invoice-alice-001" in result.evidence[0]
+
+
+def test_t04_malformed_collection_object_is_inconclusive():
+    response = GraphQLResponse({"invoices": [{"ownerId": "user-alice"}]})
+    assert evaluate_policy("anonymous", _collection_case(), response).verdict is Verdict.INCONCLUSIVE
+
+
+def test_unclassified_case_without_a_target_is_inconclusive():
     case = SimpleNamespace(
         test_id="T04", identity="anonymous", expected_outcome="inconclusive",
         target=None, inconclusive_reason=None, evidence_requirements=(),

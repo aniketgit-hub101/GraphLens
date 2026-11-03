@@ -10,9 +10,10 @@ class CanonicalCorpusTests(unittest.TestCase):
     def test_ids_order_categories_and_metadata(self) -> None:
         corpus = get_test_corpus()
         self.assertEqual([f"T{i:02}" for i in range(1, 13)], [case.test_id for case in corpus])
-        self.assertEqual([Category.ROOT_BOLA] * 4, [case.category for case in corpus[:4]])
-        self.assertEqual([Category.NESTED_BOLA] * 4, [case.category for case in corpus[4:8]])
-        self.assertEqual([Category.PROPERTY_BOPLA] * 4, [case.category for case in corpus[8:12]])
+        self.assertEqual(3, sum(case.category is Category.ROOT_BOLA for case in corpus))
+        self.assertEqual(3, sum(case.category is Category.NESTED_BOLA for case in corpus))
+        self.assertEqual(3, sum(case.category is Category.PROPERTY_BOPLA for case in corpus))
+        self.assertEqual(3, sum(case.category is Category.AUTHENTICATION for case in corpus))
         for case in corpus:
             with self.subTest(test_id=case.test_id):
                 self.assertTrue(case.operation.strip())
@@ -26,6 +27,7 @@ class CanonicalCorpusTests(unittest.TestCase):
         self.assertIs(corpus["T01"].expected_outcome, ExpectedOutcome.ALLOW)
         self.assertEqual("bob", corpus["T02"].identity)
         self.assertEqual("invoice-alice-001", corpus["T02"].target.resource_id)
+        self.assertEqual("invoice-alice-002", corpus["T10"].target.resource_id)
         self.assertIs(corpus["T02"].expected_outcome, ExpectedOutcome.DENY)
         self.assertEqual("anonymous", corpus["T08"].identity)
         self.assertIs(corpus["T08"].expected_outcome, ExpectedOutcome.DENY)
@@ -37,6 +39,8 @@ class CanonicalCorpusTests(unittest.TestCase):
         self.assertEqual("customer", corpus["T06"].target.resource_type)
         self.assertEqual((), corpus["T06"].target.object_path)
         self.assertEqual("internalNotes", corpus["T10"].target.property_name)
+        self.assertIs(corpus["T04"].category, Category.AUTHENTICATION)
+        self.assertIs(corpus["T11"].category, Category.AUTHENTICATION)
         self.assertTrue(corpus["T04"].target.is_collection)
 
 

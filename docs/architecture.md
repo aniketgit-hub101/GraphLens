@@ -2,39 +2,26 @@
 
 ## Execution flow
 
-```text
-T01–T12 corpus ─┐
-                ├─> engine.integration adapters ─> benchmark runner ─> JSON report
-C0–C5 configs ──┘                                     │
-                                                     v
-                                   real GraphQL API -> policy evaluator
-```
+The T01–T12 corpus and C0–C5 immutable configurations are adapted to canonical engine contracts. The benchmark executes each of the 72 pairs against the real GraphQL schema, then sends the actual structured response and errors to the policy evaluator. Every unit records its verdict, the actual response data used as structured evidence, GraphQL errors, runtime, and any execution failure. The kill gate checks returned IDs and property values against corpus targets and fixture authorization relationships.
 
-### API
+## Identity contract
 
-`api.runner.execute_graphql(query, identity, config, variables=None)` passes the provided variables to graphql-core and returns `engine.contracts.GraphQLResponse`. The response carries actual data and structured `GraphQLErrorInfo(message, path, locations)` values. Configurations enable API behavior only; the evaluator never reads mutant flags.
+Canonical API and engine identities are exact lowercase values: `alice`, `bob`, and `anonymous`. Whitespace, casing variants, empty strings, non-strings, and unknown names are rejected. The legacy compatibility wrapper alone case-folds historical title-case identifiers.
 
-### Corpus and configurations
+## Authorization boundaries
 
-The source corpus has 12 stable IDs and uses `operation`, tuple-pair variables, a structured corpus `Target`, lowercase identity strings, and `allow` / `deny` / `inconclusive` intent. The configuration source exposes C0–C5 with immutable mutant sets. `engine.integration` converts these values into canonical engine `TestCase`, `Target`, and `Configuration` objects. T04 remains explicitly inconclusive and needs no single-object target.
+- M1 bypasses ownership only at the root `invoice(id)` resolver.
+- M2 bypasses authorization only for nested customer resolution.
+- M3 exposes restricted properties only.
+- M4 permits anonymous access through authentication checks. It does not alter authenticated Bob's object or property access.
+- Bob is an explicit viewer of Alice's shared invoice `invoice-alice-002`; its parent is readable while owner-only `internalNotes` remains withheld unless M3 is enabled.
 
-T05–T08 query the customer resolver directly. Its authorization is tied to linked invoice ownership, so M2 can be exercised independently of the root invoice resolver.
+## Evidence and outcomes
 
-### Policy evaluator
+The evaluator uses returned data, selected paths, object identifiers, and structured GraphQL error paths. It does not infer observed verdicts from expected outcomes. An explicit null object can evidence object denial only when no relevant GraphQL error exists. Property denial requires the parent object and selected property to be present; a null selected property without relevant errors is PASS, while a missing parent or property is INCONCLUSIVE. T04 checks the real `invoices` collection: empty, null, or malformed evidence is INCONCLUSIVE; a non-empty protected collection returned to an anonymous identity is a violation.
 
-The evaluator classifies observations, not declared outcomes alone:
+## Benchmark gate and reports
 
-- An allowed target must be present; configured owner evidence must also match.
-- A returned denied object or non-null restricted property is a policy violation.
-- An explicitly selected null/withheld target can establish denial only without a relevant GraphQL error.
-- Missing response paths, missing property selections, mismatched target identity, and relevant execution errors are inconclusive.
+`tests.corpus.MUTANT_KILL_MAP` declares the behavioral cases each seeded mutant must violate. For each configuration the gate intersects that map with enabled mutants, checks every declared kill, flags unexpected violations as possible cross-mutant contamination, checks all 72 unique pairs, detects execution failures and unbound authorization resolvers, and verifies strict rejection of invalid identity/configuration inputs. Counts come from actual result rows. Setup and gate failures are serialized with `gate.status = FAILED`; the CLI exits nonzero. Runtime is measured with `perf_counter`.
 
-Evidence output contains observed facts and errors, not unverified requirement labels. `policies/rules.json` documents these semantics; the Python evaluator implements them.
-
-### Benchmark and reporting
-
-The runner validates the exact T01–T12 and C0–C5 sets, executes 72 unique pairs, and measures elapsed time with `perf_counter`. Executor/evaluator exceptions create result rows with `verdict=None` and `execution_error`, separate from verdict counts. The report checks pair uniqueness and derives all counts from result rows. `main.py` runs the benchmark, prints a summary, writes JSON, and returns a nonzero status for failed units or setup/report errors.
-
-## Backend boundary
-
-No dashboard, frontend, Flask app, or visual component is part of this backend milestone.
+No dashboard, frontend, Flask interface, or visual components are part of this backend.
