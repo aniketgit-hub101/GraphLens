@@ -1,18 +1,8 @@
-"""Public interface for resolving C0–C5 mutant selections.
+"""Canonical evaluator interface for C0–C5."""
 
-Each returned value is a declarative Configuration from ``mutants.config``;
-the API/engine adapter may pass the selected object as its ``config`` value.
-No run outcomes are stored here.
-"""
-
-from typing import Final
-
-from .config import CONFIGS_BY_ID, Configuration
+from .config import CONFIGURATIONS, Configuration
 
 
-CONFIG_IDS: Final[tuple[str, ...]] = ("C0", "C1", "C2", "C3", "C4", "C5")
-
-
-def get_configurations() -> dict[str, Configuration]:
-    """Return a fresh ID-to-configuration mapping in stable C0–C5 order."""
-    return {configuration_id: CONFIGS_BY_ID[configuration_id] for configuration_id in CONFIG_IDS}
+def get_configurations() -> tuple[Configuration, ...]:
+    """Return configs in stable C0–C5 order; mutant sets are immutable."""
+    return CONFIGURATIONS
