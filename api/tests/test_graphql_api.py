@@ -47,6 +47,19 @@ class ExecuteGraphqlTests(unittest.TestCase):
         self.assertIsNotNone(result["data"]["invoice"]["internalNotes"])
         self.assertIsNotNone(result["data"]["invoice"]["customer"]["email"])
 
+    def test_root_bola_is_independently_configurable(self):
+        result = execute_graphql('{ invoice(id: "inv-alice-001") { id } }', "Bob", {"mutants": ["ROOT_BOLA"]})
+        self.assertEqual(result["data"]["invoice"]["id"], "inv-alice-001")
+
+    def test_nested_bola_is_independently_configurable(self):
+        result = execute_graphql('{ customer(id: "customer-alice") { id name } }', "Bob", {"mutants": ["NESTED_BOLA"]})
+        self.assertEqual(result["data"]["customer"]["id"], "customer-alice")
+
+    def test_auth_bypass_allows_anonymous_protected_access(self):
+        result = execute_graphql('{ invoice(id: "inv-alice-001") { id internalNotes } }', "Anonymous", {"mutants": ["AUTH_BYPASS"]})
+        self.assertEqual(result["data"]["invoice"]["id"], "inv-alice-001")
+        self.assertIsNotNone(result["data"]["invoice"]["internalNotes"])
+
     def test_graphql_errors_have_consistent_shape(self):
         result = execute_graphql("{ fieldThatDoesNotExist }", "Alice", {})
         self.assertEqual(set(result), {"data", "errors", "status"})
