@@ -154,6 +154,11 @@ def _resolve_customer_private_field(customer: Customer, info: Any, field: str) -
     return customer[field] if owns_customer else None
 
 
+def _build_context(identity: str, config: Mapping[str, Any] | None) -> dict[str, Any]:
+    user = None if isinstance(identity, str) and identity.casefold() == "anonymous" else identity_user(identity)
+    return {"user": user, "config": config or {}}
+
+
 _SCHEMA.type_map["Query"].fields["me"].resolve = _resolve_me
 _SCHEMA.type_map["Query"].fields["invoice"].resolve = _resolve_invoice
 _SCHEMA.type_map["Query"].fields["invoices"].resolve = _resolve_invoices
@@ -181,14 +186,12 @@ def execute_graphql(
     """
     if not isinstance(query, str):
         return {"data": None, "errors": ["query must be a string"], "status": "error"}
-    if identity.casefold() == "anonymous":
-        user = None
-    else:
-        user = identity_user(identity)
+    context = _build_context(identity, config)
+    user = context["user"]
     if user is None and identity.casefold() != "anonymous":
         return {"data": None, "errors": [f"unknown identity: {identity}"], "status": "error"}
 
-    result = graphql_sync(_SCHEMA, query, context_value={"user": user, "config": config or {}})
+    result = graphql_sync(_SCHEMA, query, context_value=context)
     errors = [error.message for error in result.errors] if result.errors else []
     status = "error" if errors and result.data is None else "partial" if errors else "success"
     return {"data": result.data, "errors": errors, "status": status}

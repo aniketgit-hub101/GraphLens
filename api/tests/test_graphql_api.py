@@ -1,8 +1,10 @@
 """Independent API authorization regression tests (run with unittest)."""
 
 import unittest
+from types import SimpleNamespace
 
 from api import execute_graphql
+from api.runner import execute_graphql as execute_engine_graphql
 
 
 class ExecuteGraphqlTests(unittest.TestCase):
@@ -65,6 +67,27 @@ class ExecuteGraphqlTests(unittest.TestCase):
         self.assertEqual(set(result), {"data", "errors", "status"})
         self.assertEqual(result["status"], "error")
         self.assertTrue(result["errors"])
+
+    def test_engine_adapter_returns_structured_response_for_c0_identities(self):
+        query = '{ invoice(id: "inv-alice-001") { id } }'
+        alice = execute_engine_graphql(query, "alice", SimpleNamespace(enabled_mutants=frozenset()))
+        bob = execute_engine_graphql(query, "bob", SimpleNamespace(enabled_mutants=frozenset()))
+        anonymous = execute_engine_graphql(query, "anonymous", SimpleNamespace(enabled_mutants=frozenset()))
+        self.assertEqual(alice.data["invoice"]["id"], "inv-alice-001")
+        self.assertIsNone(bob.data["invoice"])
+        self.assertIsNone(anonymous.data["invoice"])
+        self.assertEqual(alice.errors, ())
+
+    def test_engine_m1_configuration_exposes_root_bola(self):
+        config = SimpleNamespace(enabled_mutants=frozenset({"M1"}))
+        response = execute_engine_graphql('{ invoice(id: "inv-alice-001") { id } }', "bob", config)
+        self.assertEqual(response.data["invoice"]["id"], "inv-alice-001")
+
+    def test_engine_adapter_preserves_graphql_error_paths(self):
+        response = execute_engine_graphql("{ missingField }", "alice", SimpleNamespace(enabled_mutants=frozenset()))
+        self.assertIsNone(response.data)
+        self.assertTrue(response.errors)
+        self.assertTrue(response.errors[0].message)
 
 
 if __name__ == "__main__":
