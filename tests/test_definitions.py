@@ -1,74 +1,51 @@
-"""Self-checks for corpus stability and mutant configuration structure."""
+"""Adapter and definition checks for the canonical security-test contracts."""
 
 import unittest
 
-from mutants.config import MUTANTS, MUTANT_IDS
-from mutants.configurations import CONFIG_IDS, get_configurations
-from tests.corpus import Category, ExpectedOutcome, TEST_CASES
+from mutants.configurations import get_configurations
+from tests.corpus import Category, ExpectedOutcome, Target, get_test_corpus
 
 
-class CorpusDefinitionTests(unittest.TestCase):
-    def test_twelve_unique_stable_ids_and_complete_metadata(self) -> None:
-        self.assertEqual([f"T{i:02}" for i in range(1, 13)], [case.id for case in TEST_CASES])
-        self.assertEqual(12, len({case.operation_name for case in TEST_CASES}))
-        for case in TEST_CASES:
-            with self.subTest(case=case.id):
-                self.assertTrue(case.query.strip())
-                self.assertTrue(case.target_resource)
+class CanonicalCorpusTests(unittest.TestCase):
+    def test_ids_order_categories_and_metadata(self) -> None:
+        corpus = get_test_corpus()
+        self.assertEqual([f"T{i:02}" for i in range(1, 13)], [case.test_id for case in corpus])
+        self.assertEqual([Category.ROOT_BOLA] * 4, [case.category for case in corpus[:4]])
+        self.assertEqual([Category.NESTED_BOLA] * 4, [case.category for case in corpus[4:8]])
+        self.assertEqual([Category.PROPERTY_BOPLA] * 4, [case.category for case in corpus[8:12]])
+        for case in corpus:
+            with self.subTest(test_id=case.test_id):
+                self.assertTrue(case.operation.strip())
+                self.assertIn(case.identity, {"alice", "bob", "anonymous"})
+                self.assertIsInstance(case.target, Target)
                 self.assertTrue(case.evidence_requirements)
-                self.assertTrue(case.rationale)
-                self.assertIsInstance(case.variable_map(), dict)
 
-    def test_category_ranges_match_the_corpus_contract(self) -> None:
-        self.assertEqual([Category.ROOT_BOLA] * 4, [case.category for case in TEST_CASES[:4]])
-        self.assertEqual([Category.NESTED_BOLA] * 4, [case.category for case in TEST_CASES[4:8]])
-        self.assertEqual([Category.PROPERTY_BOPLA] * 4, [case.category for case in TEST_CASES[8:12]])
+    def test_identity_controls_and_explicit_denials_preserve_cases(self) -> None:
+        corpus = {case.test_id: case for case in get_test_corpus()}
+        self.assertEqual("alice", corpus["T01"].identity)
+        self.assertIs(corpus["T01"].expected_outcome, ExpectedOutcome.ALLOW)
+        self.assertEqual("bob", corpus["T02"].identity)
+        self.assertEqual("invoice-alice-001", corpus["T02"].target.resource_id)
+        self.assertIs(corpus["T02"].expected_outcome, ExpectedOutcome.DENY)
+        self.assertEqual("anonymous", corpus["T08"].identity)
+        self.assertIs(corpus["T08"].expected_outcome, ExpectedOutcome.DENY)
+        self.assertIs(corpus["T04"].expected_outcome, ExpectedOutcome.INCONCLUSIVE)
 
-    def test_required_identities_controls_and_inconclusive_case_are_present(self) -> None:
-        identities = {case.identity.value for case in TEST_CASES}
-        self.assertEqual({"Alice", "Bob", "Anonymous"}, identities)
-        self.assertTrue(any(case.expected_outcome is ExpectedOutcome.ALLOW for case in TEST_CASES))
-        inconclusive = [case for case in TEST_CASES if case.expected_outcome is ExpectedOutcome.INCONCLUSIVE]
-        self.assertEqual(["T04"], [case.id for case in inconclusive])
-
-    def test_alice_bob_and_anonymous_policy_examples(self) -> None:
-        by_id = {case.id: case for case in TEST_CASES}
-        self.assertIs(by_id["T01"].expected_outcome, ExpectedOutcome.ALLOW)
-        self.assertEqual("Alice", by_id["T01"].identity.value)
-        self.assertIs(by_id["T02"].expected_outcome, ExpectedOutcome.DENY)
-        self.assertEqual("Bob", by_id["T02"].identity.value)
-        self.assertIs(by_id["T08"].expected_outcome, ExpectedOutcome.DENY)
-        self.assertEqual("Anonymous", by_id["T08"].identity.value)
-
-    def test_first_milestone_is_bob_to_alice_invoice(self) -> None:
-        case = TEST_CASES[1]
-        self.assertEqual("T02", case.id)
-        self.assertEqual("Bob", case.identity.value)
-        self.assertEqual("invoice-alice-001", case.target_resource)
-        self.assertIs(case.expected_outcome, ExpectedOutcome.DENY)
-        self.assertIs(case.expected_policy_behavior, ExpectedOutcome.DENY)
+    def test_target_encodes_root_nested_and_property_scope(self) -> None:
+        corpus = {case.test_id: case for case in get_test_corpus()}
+        self.assertEqual((), corpus["T02"].target.object_path)
+        self.assertEqual(("customer",), corpus["T06"].target.object_path)
+        self.assertEqual("internalNotes", corpus["T10"].target.property_name)
+        self.assertTrue(corpus["T04"].target.is_collection)
 
 
-class MutantConfigurationTests(unittest.TestCase):
-    def test_four_independent_mutants_have_distinct_ids(self) -> None:
-        self.assertEqual({"M1", "M2", "M3", "M4"}, MUTANT_IDS)
-        self.assertEqual(4, len(MUTANTS))
-
-    def test_c0_to_c5_select_single_or_combined_mutants(self) -> None:
+class CanonicalConfigurationTests(unittest.TestCase):
+    def test_configurations_keep_ids_and_frozen_mutant_sets(self) -> None:
         configurations = get_configurations()
-        self.assertEqual(tuple(f"C{i}" for i in range(6)), CONFIG_IDS)
-        self.assertEqual(tuple(f"C{i}" for i in range(6)), tuple(configurations))
-        self.assertEqual((), configurations["C0"].enabled_mutants)
-        for config_id, mutant_id in zip(CONFIG_IDS[1:5], ("M1", "M2", "M3", "M4")):
-            self.assertEqual((mutant_id,), configurations[config_id].enabled_mutants)
-        self.assertEqual(("M1", "M2", "M3", "M4"), configurations["C5"].enabled_mutants)
-        for config in configurations.values():
-            self.assertTrue(set(config.enabled_mutants) <= MUTANT_IDS)
-
-    def test_corpus_entry_point_returns_stable_t01_t12_order(self) -> None:
-        from tests.corpus import get_test_corpus
-
-        self.assertEqual(TEST_CASES, get_test_corpus())
+        self.assertEqual([f"C{i}" for i in range(6)], [config.configuration_id for config in configurations])
+        expected = [frozenset(), frozenset({"M1"}), frozenset({"M2"}), frozenset({"M3"}), frozenset({"M4"}), frozenset({"M1", "M2", "M3", "M4"})]
+        self.assertEqual(expected, [config.enabled_mutants for config in configurations])
+        self.assertTrue(all(isinstance(config.enabled_mutants, frozenset) for config in configurations))
 
 
 if __name__ == "__main__":
