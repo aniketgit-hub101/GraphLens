@@ -182,30 +182,6 @@ def test_kill_evidence_for_different_declared_target_fails_gate():
     report = run_benchmark(); row = _kill_row(report, "C1", "T02")
     altered = replace(row, response_data={"invoice": {**row.response_data["invoice"], "id": "invoice-alice-002"}})
     assert any("does not match the declared target" in f for f in _gate_with_replaced_row(report, altered))
-def test_malformed_collection_evidence_fails_gate():
-    report = run_benchmark()
-    row = _kill_row(report, "C4", "T04")
-    altered = replace(row, response_data={"invoices": "not-a-list"})
-    assert any(
-        "non-empty response collection" in f
-        for f in _gate_with_replaced_row(report, altered)
-    )
-
-
-def test_property_kill_with_wrong_parent_object_fails_gate():
-    report = run_benchmark()
-    row = _kill_row(report, "C3", "T10")
-    altered = replace(
-        row,
-        response_data={
-            "invoice": {
-                **row.response_data["invoice"],
-                "id": "invoice-bob-001",
-            }
-        },
-    )
-    assert _gate_with_replaced_row(report, altered)
-
 def test_malformed_collection_evidence_fails_with_specific_finding():
     report = run_benchmark(); row = _kill_row(report, "C4", "T04")
     assert row.verdict is Verdict.POLICY_VIOLATION

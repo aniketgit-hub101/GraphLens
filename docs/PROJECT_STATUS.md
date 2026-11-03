@@ -1,26 +1,27 @@
 # GraphLens project status
 
-Snapshot: 2026-11-03. Security corrections are under local validation on `fix/security-audit`, based on the preserved `integration/mvp` release commit `ef2758c535bcf63f6fa8cb883496d82dec7558f5`. No merge or push is part of this work.
+Security audit commit `5188685260ff697df29e324a411585e48093af17` was published on `fix/security-audit`; PR base is `integration/mvp`. This document preserves validation reported before the current cleanup revision. Those results are historical and are not validation of this cleanup revision.
 
-## Backend corrections
+## Historical validation (before this cleanup revision)
 
-- Canonical strict configuration and identity validation rejects unknown names, duplicate mutants, malformed inputs, and unsupported identities.
-- M1, M2, M3, and M4 are isolated to root BOLA, nested BOLA, property exposure, and anonymous authentication bypass respectively.
-- T10 uses a shared invoice so Bob's parent access is independently evidenced from `internalNotes`; T12 continues to deny `confidentialCode` to its owner unless M3 is enabled.
-- The evaluator uses actual response evidence. Missing parent/property evidence and relevant GraphQL errors remain `INCONCLUSIVE`; T04 evaluates real collection evidence.
-- The behavioral benchmark gate checks declared mutant kills, unexpected vulnerability cells, cross-mutant contamination, resolver bindings, strict invalid-input rejection, execution failures, and exact pair accounting.
-- CLI setup and gate failures produce a JSON report with `gate.status = FAILED` and nonzero exit status. No UI components are included.
+- `python -m compileall -q .`: passed.
+- `python -m pytest -q`: 72 passed, 24 subtests passed.
+- `python -m pytest api/tests -v`: 27 passed, 12 subtests passed.
+- `python -m pytest engine -v`: 35 passed.
+- `python main.py`: 72/72 test/configuration pairs, gate PASSED.
+- Historical verdict counts: 54 PASS, 14 POLICY_VIOLATION, 4 INCONCLUSIVE.
 
-## Latest measured validation
+## Backend and limitations
 
-- `python main.py`: 72/72 unique test/configuration units, zero execution failures, gate PASSED; 54 PASS, 14 POLICY_VIOLATION, 4 INCONCLUSIVE; measured runtime 54.312 ms.
-- Matrix audit: 12 unique tests × 6 unique configurations; all 72 pairs occur once. T04 is INCONCLUSIVE for C0–C3 with empty collection evidence and POLICY_VIOLATION for C4–C5 with returned protected invoice IDs.
-- Representative observed violations include T02/C1 and T06/C2 unauthorized objects, T10/C3 and T12/C3 non-null restricted properties, and T04/C4 anonymous collection disclosure.
-- Focused suites last run: `python -m pytest api/tests -v` — 26 passed; `python -m pytest engine -v` — 22 passed; `python -m pytest tests/test_definitions.py -q` — 4 passed, 12 subtests passed.
-- `python -m compileall -q .`: passed. `python -m pytest -q`: 58 passed, 12 subtests passed.
+The backend has strict canonical identity validation, isolated M1–M4 behavior, an evidence-based evaluator, a response-backed benchmark kill gate, exact 72-pair accounting, resolver-binding checks, and CLI failure-report behavior. T04 remains INCONCLUSIVE for empty collections in C0–C3 and is a violation in C4–C5 only when protected invoice IDs are actually returned.
 
-## Limitations
+The API is an in-process synthetic GraphQL fixture, not a deployed HTTP service.
 
-The API is a deterministic in-process GraphQL fixture rather than a deployed HTTP service. T04 detects a non-empty returned protected collection; an empty collection cannot prove per-object authorization and remains inconclusive.
+## Cleanup revision validation
 
-Generated benchmark output under `results/` is ignored by Git. Nothing has been committed, merged, or pushed.
+- `python -m compileall -q .`: passed.
+- `python -m pytest -q`: 70 passed, 24 subtests passed after removing the two duplicate tests.
+- `python -m pytest api/tests -v`: 27 passed, 12 subtests passed.
+- `python -m pytest engine -v`: 33 passed.
+- `python main.py`: 72/72 pairs, gate PASSED; 54 PASS, 14 POLICY_VIOLATION, 4 INCONCLUSIVE.
+- `git diff --check`: passed.

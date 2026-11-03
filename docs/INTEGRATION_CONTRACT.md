@@ -5,7 +5,7 @@ This document records the implemented integration boundary. The security correct
 ## Engine contracts
 
 - `GraphQLResponse(data: Mapping[str, object] | None, errors: tuple[GraphQLErrorInfo, ...], http_status: int | None)` carries actual API output. Each error has `message`, optional `path`, and `locations`.
-- Engine `TestCase` fields: `test_id`, `description`, exact lowercase `identity` (only `alice`, `bob`, or `anonymous`; no case or whitespace normalization). The legacy API wrapper alone maps historical title-case names to lowercase., GraphQL `operation`, variables mapping, optional structured `Target`, `expected_outcome`, `evidence_requirements`, and optional `inconclusive_reason`.
+- Engine `TestCase` fields: `test_id`, `description`, exact lowercase `identity` (only `alice`, `bob`, or `anonymous`; case and whitespace variants are rejected), GraphQL `operation`, variables mapping, optional structured `Target`, `expected_outcome`, `evidence_requirements`, and optional `inconclusive_reason`. The legacy API wrapper alone case-folds historical title-case names; it does not strip whitespace.
 - Engine `Target` fields: response path, object ID, optional property name/path, optional owner evidence path/expected owner ID, `is_collection`, `requires_authentication`, and `object_id_field`. Collection targets retain evidence paths even when the expected intent is inconclusive.
 - Engine `Configuration` fields: `configuration_id`, `name`, and `enabled_mutants: frozenset[str]`.
 

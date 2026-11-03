@@ -1,0 +1,30 @@
+name: Backend validation
+
+on:
+  push:
+    branches:
+      - fix/security-audit
+  pull_request:
+    branches:
+      - integration/mvp
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt pytest
+      - name: Compile Python sources
+        run: python -m compileall -q .
+      - name: Run test suite
+        run: python -m pytest -q
+      - name: Run benchmark
+        run: python main.py
+      - name: Check diff formatting
+        run: git diff --check
