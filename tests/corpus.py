@@ -10,9 +10,9 @@ from typing import Final
 
 
 class Identity(str, Enum):
-    ALICE = "alice"
-    BOB = "bob"
-    ANONYMOUS = "anonymous"
+    ALICE = "Alice"
+    BOB = "Bob"
+    ANONYMOUS = "Anonymous"
 
 
 class ExpectedOutcome(str, Enum):
@@ -39,6 +39,11 @@ class TestCase:
     expected_outcome: ExpectedOutcome
     evidence_requirements: tuple[str, ...]
     rationale: str
+
+    @property
+    def expected_policy_behavior(self) -> ExpectedOutcome:
+        """Policy-level expectation; this is not an observed run verdict."""
+        return self.expected_outcome
 
     def variable_map(self) -> dict[str, str]:
         """Return a fresh variables mapping suitable for a GraphQL executor."""
@@ -223,3 +228,8 @@ TEST_CASES: Final[tuple[TestCase, ...]] = (
 )
 
 CASES_BY_ID: Final[dict[str, TestCase]] = {case.id: case for case in TEST_CASES}
+
+
+def get_test_corpus() -> tuple[TestCase, ...]:
+    """Return the fixed T01–T12 corpus in stable execution order."""
+    return TEST_CASES

@@ -2,7 +2,8 @@
 
 import unittest
 
-from mutants.config import CONFIGURATIONS, MUTANTS, MUTANT_IDS
+from mutants.config import MUTANTS, MUTANT_IDS
+from mutants.configurations import CONFIG_IDS, get_configurations
 from tests.corpus import Category, ExpectedOutcome, TEST_CASES
 
 
@@ -25,17 +26,27 @@ class CorpusDefinitionTests(unittest.TestCase):
 
     def test_required_identities_controls_and_inconclusive_case_are_present(self) -> None:
         identities = {case.identity.value for case in TEST_CASES}
-        self.assertEqual({"alice", "bob", "anonymous"}, identities)
+        self.assertEqual({"Alice", "Bob", "Anonymous"}, identities)
         self.assertTrue(any(case.expected_outcome is ExpectedOutcome.ALLOW for case in TEST_CASES))
         inconclusive = [case for case in TEST_CASES if case.expected_outcome is ExpectedOutcome.INCONCLUSIVE]
         self.assertEqual(["T04"], [case.id for case in inconclusive])
 
+    def test_alice_bob_and_anonymous_policy_examples(self) -> None:
+        by_id = {case.id: case for case in TEST_CASES}
+        self.assertIs(by_id["T01"].expected_outcome, ExpectedOutcome.ALLOW)
+        self.assertEqual("Alice", by_id["T01"].identity.value)
+        self.assertIs(by_id["T02"].expected_outcome, ExpectedOutcome.DENY)
+        self.assertEqual("Bob", by_id["T02"].identity.value)
+        self.assertIs(by_id["T08"].expected_outcome, ExpectedOutcome.DENY)
+        self.assertEqual("Anonymous", by_id["T08"].identity.value)
+
     def test_first_milestone_is_bob_to_alice_invoice(self) -> None:
         case = TEST_CASES[1]
         self.assertEqual("T02", case.id)
-        self.assertEqual("bob", case.identity.value)
+        self.assertEqual("Bob", case.identity.value)
         self.assertEqual("invoice-alice-001", case.target_resource)
         self.assertIs(case.expected_outcome, ExpectedOutcome.DENY)
+        self.assertIs(case.expected_policy_behavior, ExpectedOutcome.DENY)
 
 
 class MutantConfigurationTests(unittest.TestCase):
@@ -44,13 +55,20 @@ class MutantConfigurationTests(unittest.TestCase):
         self.assertEqual(4, len(MUTANTS))
 
     def test_c0_to_c5_select_single_or_combined_mutants(self) -> None:
-        self.assertEqual([f"C{i}" for i in range(6)], [config.id for config in CONFIGURATIONS])
-        self.assertEqual((), CONFIGURATIONS[0].enabled_mutants)
-        for config, mutant_id in zip(CONFIGURATIONS[1:5], ("M1", "M2", "M3", "M4")):
-            self.assertEqual((mutant_id,), config.enabled_mutants)
-        self.assertEqual(("M1", "M2", "M3", "M4"), CONFIGURATIONS[5].enabled_mutants)
-        for config in CONFIGURATIONS:
+        configurations = get_configurations()
+        self.assertEqual(tuple(f"C{i}" for i in range(6)), CONFIG_IDS)
+        self.assertEqual(tuple(f"C{i}" for i in range(6)), tuple(configurations))
+        self.assertEqual((), configurations["C0"].enabled_mutants)
+        for config_id, mutant_id in zip(CONFIG_IDS[1:5], ("M1", "M2", "M3", "M4")):
+            self.assertEqual((mutant_id,), configurations[config_id].enabled_mutants)
+        self.assertEqual(("M1", "M2", "M3", "M4"), configurations["C5"].enabled_mutants)
+        for config in configurations.values():
             self.assertTrue(set(config.enabled_mutants) <= MUTANT_IDS)
+
+    def test_corpus_entry_point_returns_stable_t01_t12_order(self) -> None:
+        from tests.corpus import get_test_corpus
+
+        self.assertEqual(TEST_CASES, get_test_corpus())
 
 
 if __name__ == "__main__":
