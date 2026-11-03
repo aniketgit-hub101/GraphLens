@@ -1,32 +1,73 @@
-# Python bytecode and test/type/lint caches
+# Python bytecode and caches
 __pycache__/
 *.py[cod]
+*$py.class
 .pytest_cache/
 .mypy_cache/
+.dmypy.json
+dmypy.json
+.pyre/
+.pytype/
 .ruff_cache/
 .coverage
+.coverage.*
 htmlcov/
+.tox/
+.nox/
+.hypothesis/
 
-# Virtual environments and local environment configuration
+# Virtual environments and local secrets
 .venv/
 venv/
 env/
+ENV/
+env.bak/
+venv.bak/
 .env
 .env.*
 !.env.example
+.envrc
 
-# Build and packaging output
+# Python build and packaging output
 build/
 dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+wheels/
+share/python-wheels/
 *.egg-info/
+.installed.cfg
+*.egg
+.Python
+MANIFEST
 
-# Generated benchmark output; keep the results directory itself
+# Generated benchmark output (keep the folders and source files)
 results/*
 !results/.gitkeep
 reports/latest.json
 
-# Editor and operating system files
-.idea/
-.vscode/
+# Common local tool output
+*.log
+*.pid
+.ipynb_checkpoints/
 .DS_Store
 Thumbs.db
+.idea/
+.vscode/
+
+# Common Python project tool state
+.pdm-python
+.pdm-build/
+.pixi/
+__pypackages__/
+.spyderproject
+.spyproject
+.ropeproject
+.pybuilder/
+.pytest_cache/
+.streamlit/secrets.toml
